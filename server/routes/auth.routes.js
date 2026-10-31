@@ -23,6 +23,9 @@ function getClientUrl(req) {
   return base;
 }
 
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
+
 /**
  * GET /api/auth/config
  * Returns OAuth provider status so client knows if live keys are configured
@@ -32,8 +35,8 @@ router.get('/config', (req, res) => {
     success: true,
     providers: {
       google: {
-        configured: Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
-        clientId: process.env.GOOGLE_CLIENT_ID || null
+        configured: Boolean(GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET),
+        clientId: GOOGLE_CLIENT_ID || null
       },
       github: {
         configured: Boolean(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET),
@@ -156,13 +159,12 @@ router.get('/github/callback', async (req, res) => {
  * Initiates Google OAuth flow or redirects with status
  */
 router.get('/google', (req, res) => {
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  if (!clientId || !process.env.GOOGLE_CLIENT_SECRET) {
+  if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
     return res.redirect(`${getClientUrl(req)}/?oauth_info=google_unconfigured`);
   }
 
   const callbackUrl = `${getBaseUrl(req)}/api/auth/google/callback`;
-  const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(callbackUrl)}&response_type=code&scope=openid%20profile%20email&access_type=offline&prompt=select_account`;
+  const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(callbackUrl)}&response_type=code&scope=openid%20profile%20email&access_type=offline&prompt=select_account`;
   res.redirect(googleAuthUrl);
 });
 
@@ -189,8 +191,8 @@ router.get('/google/callback', async (req, res) => {
       },
       body: new URLSearchParams({
         code,
-        client_id: process.env.GOOGLE_CLIENT_ID,
-        client_secret: process.env.GOOGLE_CLIENT_SECRET,
+        client_id: GOOGLE_CLIENT_ID,
+        client_secret: GOOGLE_CLIENT_SECRET,
         redirect_uri: callbackUrl,
         grant_type: 'authorization_code'
       })
