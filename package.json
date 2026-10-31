@@ -1,0 +1,18 @@
+{
+  "name": "placement-prep-dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "cd client && npm install && npm run build",
+    "install:all": "npm install --prefix server && npm install --prefix client",
+    "dev:server": "npm run dev --prefix server",
+    "dev:client": "npm run dev --prefix client",
+    "dev": "node -e \"const { spawn } = require('child_process'); const isWin = process.platform === 'win32'; const cmd = isWin ? 'npm.cmd' : 'npm'; spawn(cmd, ['run', 'dev', '--prefix', 'server'], { stdio: 'inherit' }); spawn(cmd, ['run', 'dev', '--prefix', 'client'], { stdio: 'inherit' });\""
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2"
+  }
+}

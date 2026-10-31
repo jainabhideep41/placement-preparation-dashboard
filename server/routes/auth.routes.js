@@ -1,0 +1,285 @@
+import express from 'express';
+
+const router = express.Router();
+
+const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
+const SERVER_URL = process.env.SERVER_URL || 'http://localhost:5000';
+
+/**
+ * GET /api/auth/config
+ * Returns OAuth provider status so client knows if live keys are configured
+ */
+router.get('/config', (req, res) => {
+  res.json({
+    success: true,
+    providers: {
+      google: {
+        configured: Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
+        clientId: process.env.GOOGLE_CLIENT_ID || null
+      },
+      github: {
+        configured: Boolean(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET),
+        clientId: process.env.GITHUB_CLIENT_ID || null
+      }
+    }
+  });
+});
+
+/**
+ * GET /api/auth/github
+ * Initiates GitHub OAuth flow or redirects with status
+ */
+router.get('/github', (req, res) => {
+  const clientId = process.env.GITHUB_CLIENT_ID;
+  if (!clientId || !process.env.GITHUB_CLIENT_SECRET) {
+    // Redirect with prompt indicator so client opens interactive sign-in
+    return res.redirect(`${CLIENT_URL}/?oauth_info=github_unconfigured`);
+  }
+
+  const callbackUrl = `${SERVER_URL}/api/auth/github/callback`;
+  const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(callbackUrl)}&scope=read:user,user:email`;
+  res.redirect(githubAuthUrl);
+});
+
+/**
+ * GET /api/auth/github/callback
+ * Handles GitHub OAuth code exchange
+ */
+router.get('/github/callback', async (req, res) => {
+  const { code, error } = req.query;
+
+  if (error || !code) {
+    console.warn('[GitHub OAuth] Authorization error:', error);
+    return res.redirect(`${CLIENT_URL}/?oauth_error=${encodeURIComponent(error || 'Authorization denied')}`);
+  }
+
+  try {
+    // 1. Exchange code for access token
+    const tokenResponse = await fetch('https://github.com/login/oauth/access_token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json'
+      },
+      body: JSON.stringify({
+        client_id: process.env.GITHUB_CLIENT_ID,
+        client_secret: process.env.GITHUB_CLIENT_SECRET,
+        code
+      })
+    });
+
+    const tokenData = await tokenResponse.json();
+    if (tokenData.error || !tokenData.access_token) {
+      throw new Error(tokenData.error_description || tokenData.error || 'Failed to exchange GitHub token');
+    }
+
+    const accessToken = tokenData.access_token;
+
+    // 2. Fetch user profile
+    const userResponse = await fetch('https://api.github.com/user', {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'User-Agent': 'Placement-Preparation-Dashboard'
+      }
+    });
+
+    if (!userResponse.ok) {
+      throw new Error(`Failed to fetch GitHub profile: ${userResponse.statusText}`);
+    }
+
+    const ghUser = await userResponse.json();
+
+    // 3. Try fetching primary verified email if user.email is null
+    let primaryEmail = ghUser.email;
+    if (!primaryEmail) {
+      try {
+        const emailsResponse = await fetch('https://api.github.com/user/emails', {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'User-Agent': 'Placement-Preparation-Dashboard'
+          }
+        });
+        if (emailsResponse.ok) {
+          const emails = await emailsResponse.json();
+          const primary = emails.find((e) => e.primary && e.verified) || emails[0];
+          if (primary) primaryEmail = primary.email;
+        }
+      } catch (emailErr) {
+        console.warn('[GitHub OAuth] Could not fetch private email list:', emailErr.message);
+      }
+    }
+
+    // 4. Construct authenticated student profile
+    const studentUser = {
+      id: `gh_${ghUser.id}`,
+      name: ghUser.name || ghUser.login,
+      email: primaryEmail || `${ghUser.login}@users.noreply.github.com`,
+      targetRole: 'Software Development Engineer (SDE-1)',
+      provider: 'github',
+      avatarUrl: ghUser.avatar_url,
+      handles: {
+        leetcode: '',
+        codeforces: '',
+        github: ghUser.login // Automatically links their real GitHub handle!
+      },
+      loggedInAt: new Date().toISOString()
+    };
+
+    const userParam = encodeURIComponent(JSON.stringify(studentUser));
+    res.redirect(`${CLIENT_URL}/?oauth_success=true&user=${userParam}`);
+  } catch (err) {
+    console.error('[GitHub OAuth Error]:', err.message);
+    res.redirect(`${CLIENT_URL}/?oauth_error=${encodeURIComponent(err.message)}`);
+  }
+});
+
+/**
+ * GET /api/auth/google
+ * Initiates Google OAuth flow or redirects with status
+ */
+router.get('/google', (req, res) => {
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  if (!clientId || !process.env.GOOGLE_CLIENT_SECRET) {
+    return res.redirect(`${CLIENT_URL}/?oauth_info=google_unconfigured`);
+  }
+
+  const callbackUrl = `${SERVER_URL}/api/auth/google/callback`;
+  const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(callbackUrl)}&response_type=code&scope=openid%20profile%20email&access_type=offline&prompt=select_account`;
+  res.redirect(googleAuthUrl);
+});
+
+/**
+ * GET /api/auth/google/callback
+ * Handles Google OAuth code exchange
+ */
+router.get('/google/callback', async (req, res) => {
+  const { code, error } = req.query;
+
+  if (error || !code) {
+    console.warn('[Google OAuth] Authorization error:', error);
+    return res.redirect(`${CLIENT_URL}/?oauth_error=${encodeURIComponent(error || 'Authorization denied')}`);
+  }
+
+  try {
+    const callbackUrl = `${SERVER_URL}/api/auth/google/callback`;
+
+    // 1. Exchange code for access token
+    const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: new URLSearchParams({
+        code,
+        client_id: process.env.GOOGLE_CLIENT_ID,
+        client_secret: process.env.GOOGLE_CLIENT_SECRET,
+        redirect_uri: callbackUrl,
+        grant_type: 'authorization_code'
+      })
+    });
+
+    const tokenData = await tokenResponse.json();
+    if (tokenData.error || !tokenData.access_token) {
+      throw new Error(tokenData.error_description || tokenData.error || 'Failed to exchange Google token');
+    }
+
+    // 2. Fetch user profile
+    const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+      headers: {
+        Authorization: `Bearer ${tokenData.access_token}`
+      }
+    });
+
+    if (!userInfoResponse.ok) {
+      throw new Error(`Failed to fetch Google userinfo: ${userInfoResponse.statusText}`);
+    }
+
+    const gUser = await userInfoResponse.json();
+
+    // 3. Construct authenticated student profile
+    const studentUser = {
+      id: `google_${gUser.sub}`,
+      name: gUser.name || gUser.given_name || 'Google User',
+      email: gUser.email,
+      targetRole: 'Software Development Engineer (SDE-1)',
+      provider: 'google',
+      avatarUrl: gUser.picture,
+      handles: {
+        leetcode: '',
+        codeforces: '',
+        github: ''
+      },
+      loggedInAt: new Date().toISOString()
+    };
+
+    const userParam = encodeURIComponent(JSON.stringify(studentUser));
+    res.redirect(`${CLIENT_URL}/?oauth_success=true&user=${userParam}`);
+  } catch (err) {
+    console.error('[Google OAuth Error]:', err.message);
+    res.redirect(`${CLIENT_URL}/?oauth_error=${encodeURIComponent(err.message)}`);
+  }
+});
+
+/**
+ * POST /api/auth/instant-oauth
+ * Fallback interactive OAuth for viva / instant verification
+ * If user gives a GitHub username, fetches public GitHub API to populate real avatar and details
+ */
+router.post('/instant-oauth', async (req, res) => {
+  const { provider, username, email, name } = req.body;
+
+  try {
+    let studentUser = {
+      id: `${provider}_${Date.now()}`,
+      name: name || 'Student Developer',
+      email: email || `${username || 'student'}@${provider}.auth`,
+      targetRole: 'Software Development Engineer (SDE-1)',
+      provider: provider || 'oauth',
+      avatarUrl: null,
+      handles: {
+        leetcode: '',
+        codeforces: '',
+        github: ''
+      },
+      loggedInAt: new Date().toISOString()
+    };
+
+    if (provider === 'github') {
+      const ghUser = username ? username.trim() : 'torvalds';
+      try {
+        const ghRes = await fetch(`https://api.github.com/users/${encodeURIComponent(ghUser)}`, {
+          headers: { 'User-Agent': 'Placement-Preparation-Dashboard' }
+        });
+        if (ghRes.ok) {
+          const ghData = await ghRes.json();
+          studentUser.name = ghData.name || ghData.login;
+          studentUser.email = ghData.email || `${ghData.login}@users.noreply.github.com`;
+          studentUser.avatarUrl = ghData.avatar_url;
+          studentUser.handles.github = ghData.login;
+        } else {
+          studentUser.name = ghUser;
+          studentUser.handles.github = ghUser;
+        }
+      } catch (e) {
+        studentUser.handles.github = ghUser;
+      }
+    } else if (provider === 'google') {
+      const googleName = name || (email ? email.split('@')[0] : 'Google Student');
+      studentUser.name = googleName;
+      studentUser.email = email || 'student@gmail.com';
+      studentUser.avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(studentUser.name)}&background=0D8ABC&color=fff`;
+    }
+
+    res.json({
+      success: true,
+      user: studentUser
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: err.message
+    });
+  }
+});
+
+export default router;
