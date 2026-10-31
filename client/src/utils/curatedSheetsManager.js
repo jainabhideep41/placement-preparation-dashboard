@@ -9,10 +9,10 @@
  * 5. Fuzzy & intelligent search matching across titles, topics, platforms, and sheets.
  */
 
-import { striverSdeSheet } from '../data/striverSdeSheet';
-import { blind75Sheet } from '../data/blind75Sheet';
-import { neetcode150Sheet } from '../data/neetcode150Sheet';
-import { cpEssentialsSheet } from '../data/cpEssentialsSheet';
+import { striverSdeSheet } from '../data/striverSdeSheet.js';
+import { blind75Sheet } from '../data/blind75Sheet.js';
+import { neetcode150Sheet } from '../data/neetcode150Sheet.js';
+import { cpEssentialsSheet } from '../data/cpEssentialsSheet.js';
 
 export const CANONICAL_STORAGE_KEY = 'prep_curated_canonical_solved_map';
 
@@ -275,3 +275,77 @@ export function matchProblem(problem, rawQuery) {
 
   return false;
 }
+
+export const TOPIC_DEFINITIONS = [
+  { id: "arrays", name: "Arrays & Two Pointers", category: "Foundation" },
+  { id: "strings", name: "Strings & Hashing", category: "Foundation" },
+  { id: "binary_search", name: "Binary Search", category: "Foundation" },
+  { id: "math", name: "Implementation & Math", category: "Foundation" },
+  { id: "linked_list", name: "Linked List", category: "Data Structures" },
+  { id: "stack_queue", name: "Stack & Queue", category: "Data Structures" },
+  { id: "trees", name: "Binary Trees & BST", category: "Data Structures" },
+  { id: "heaps", name: "Heaps & Priority Queues", category: "Data Structures" },
+  { id: "graphs", name: "Graphs (BFS, DFS, Dijkstra)", category: "Advanced" },
+  { id: "dp", name: "Dynamic Programming", category: "Advanced" },
+  { id: "greedy", name: "Greedy Algorithms", category: "Advanced" },
+  { id: "backtracking", name: "Backtracking & Recursion", category: "Advanced" },
+  { id: "trie", name: "Trie & Bit Manipulation", category: "Advanced" }
+];
+
+export function matchProblemToTopic(probTopic, topicName) {
+  if (!probTopic) return false;
+  if (probTopic === topicName) return true;
+  if (topicName.startsWith('Graphs') && (probTopic === 'Graphs' || probTopic.includes('Graph'))) return true;
+  if (topicName.includes('Arrays') && (probTopic.includes('Array') || probTopic.includes('Two Pointer'))) return true;
+  if (topicName.includes('Trees') && (probTopic.includes('Tree') || probTopic.includes('BST'))) return true;
+  if (topicName.includes('Trie') && (probTopic.includes('Trie') || probTopic.includes('Bit'))) return true;
+  if (topicName.includes('Strings') && (probTopic.includes('String') || probTopic.includes('Hash'))) return true;
+  if (topicName.includes('Math') && (probTopic.includes('Math') || probTopic.includes('Implementation'))) return true;
+  if (topicName.includes('Dynamic Programming') && (probTopic.includes('Dynamic Programming') || probTopic === 'DP')) return true;
+  if (topicName.includes('Linked List') && probTopic.includes('Linked List')) return true;
+  if (topicName.includes('Stack & Queue') && (probTopic.includes('Stack') || probTopic.includes('Queue'))) return true;
+  if (topicName.includes('Binary Search') && probTopic.includes('Binary Search')) return true;
+  if (topicName.includes('Heaps') && (probTopic.includes('Heap') || probTopic.includes('Priority Queue'))) return true;
+  if (topicName.includes('Greedy') && probTopic.includes('Greedy')) return true;
+  if (topicName.includes('Backtracking') && (probTopic.includes('Backtracking') || probTopic.includes('Recursion'))) return true;
+  return false;
+}
+
+export function getTopicMasteryStats(canonicalSolvedMap = {}, customProblems = []) {
+  return TOPIC_DEFINITIONS.map(def => {
+    const topicProblems = ALL_UNIQUE_PROBLEMS.filter(p => matchProblemToTopic(p.topic, def.name));
+    const seenKeys = new Set();
+    let solvedCount = 0;
+
+    for (const p of topicProblems) {
+      if (isProblemSolved(p, canonicalSolvedMap)) {
+        seenKeys.add(p.canonicalKey);
+        solvedCount++;
+      }
+    }
+
+    for (const p of customProblems) {
+      if (matchProblemToTopic(p.topic, def.name) && p.status === 'Solved') {
+        const key = getCanonicalKey(p) || p.title?.toLowerCase();
+        if (key && !seenKeys.has(key)) {
+          seenKeys.add(key);
+          solvedCount++;
+        }
+      }
+    }
+
+    const total = topicProblems.length > 0 ? topicProblems.length : 25;
+    const percent = Math.round((solvedCount / total) * 100) || 0;
+
+    return {
+      id: def.id,
+      name: def.name,
+      category: def.category,
+      total,
+      solved: solvedCount,
+      percent,
+      problems: topicProblems
+    };
+  });
+}
+

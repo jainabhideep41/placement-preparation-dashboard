@@ -104,6 +104,41 @@ const SHEET_REGISTRY = {
   }
 };
 
+const SERVER_TOPIC_DEFINITIONS = [
+  { id: "arrays", name: "Arrays & Two Pointers", category: "Foundation" },
+  { id: "strings", name: "Strings & Hashing", category: "Foundation" },
+  { id: "binary_search", name: "Binary Search", category: "Foundation" },
+  { id: "math", name: "Implementation & Math", category: "Foundation" },
+  { id: "linked_list", name: "Linked List", category: "Data Structures" },
+  { id: "stack_queue", name: "Stack & Queue", category: "Data Structures" },
+  { id: "trees", name: "Binary Trees & BST", category: "Data Structures" },
+  { id: "heaps", name: "Heaps & Priority Queues", category: "Data Structures" },
+  { id: "graphs", name: "Graphs (BFS, DFS, Dijkstra)", category: "Advanced" },
+  { id: "dp", name: "Dynamic Programming", category: "Advanced" },
+  { id: "greedy", name: "Greedy Algorithms", category: "Advanced" },
+  { id: "backtracking", name: "Backtracking & Recursion", category: "Advanced" },
+  { id: "trie", name: "Trie & Bit Manipulation", category: "Advanced" }
+];
+
+function matchServerProblemToTopic(probTopic, topicName) {
+  if (!probTopic) return false;
+  if (probTopic === topicName) return true;
+  if (topicName.startsWith('Graphs') && (probTopic === 'Graphs' || probTopic.includes('Graph'))) return true;
+  if (topicName.includes('Arrays') && (probTopic.includes('Array') || probTopic.includes('Two Pointer'))) return true;
+  if (topicName.includes('Trees') && (probTopic.includes('Tree') || probTopic.includes('BST'))) return true;
+  if (topicName.includes('Trie') && (probTopic.includes('Trie') || probTopic.includes('Bit'))) return true;
+  if (topicName.includes('Strings') && (probTopic.includes('String') || probTopic.includes('Hash'))) return true;
+  if (topicName.includes('Math') && (probTopic.includes('Math') || probTopic.includes('Implementation'))) return true;
+  if (topicName.includes('Dynamic Programming') && (probTopic.includes('Dynamic Programming') || probTopic === 'DP')) return true;
+  if (topicName.includes('Linked List') && probTopic.includes('Linked List')) return true;
+  if (topicName.includes('Stack & Queue') && (probTopic.includes('Stack') || probTopic.includes('Queue'))) return true;
+  if (topicName.includes('Binary Search') && probTopic.includes('Binary Search')) return true;
+  if (topicName.includes('Heaps') && (probTopic.includes('Heap') || probTopic.includes('Priority Queue'))) return true;
+  if (topicName.includes('Greedy') && probTopic.includes('Greedy')) return true;
+  if (topicName.includes('Backtracking') && (probTopic.includes('Backtracking') || probTopic.includes('Recursion'))) return true;
+  return false;
+}
+
 router.get('/', async (req, res) => {
   const { cf_user = '', lc_user = '', ac_user = '', hr_user = '' } = req.query;
 
@@ -127,11 +162,44 @@ router.get('/', async (req, res) => {
 
     const liveSubs = [...(cf.recentSubmissions || []), ...(lc.recentSubmissions || [])];
     for (const sub of liveSubs) {
+      const canonKey = getCanonicalKey(sub);
+      const matchedUnique = allUniqueSheet.find(u => u.canonicalKey === canonKey || u.title.toLowerCase() === sub.title.toLowerCase());
+      if (matchedUnique) {
+        sub.topic = matchedUnique.topic;
+        sub.difficulty = matchedUnique.difficulty;
+        sub.canonicalKey = canonKey;
+      }
       if (!existingTitles.has(sub.title.toLowerCase())) {
         existingTitles.add(sub.title.toLowerCase());
         combinedProblems.unshift(sub);
       }
     }
+
+    // Dynamic Topic stats calculated from allUniqueSheet & combinedProblems
+    const dynamicTopics = SERVER_TOPIC_DEFINITIONS.map(def => {
+      const topicProblems = allUniqueSheet.filter(p => matchServerProblemToTopic(p.topic, def.name));
+      const seenKeys = new Set();
+      let solvedCount = 0;
+
+      for (const p of combinedProblems) {
+        if (p.status === 'Solved' && matchServerProblemToTopic(p.topic, def.name)) {
+          const key = p.canonicalKey || getCanonicalKey(p) || p.title?.toLowerCase();
+          if (key && !seenKeys.has(key)) {
+            seenKeys.add(key);
+            solvedCount++;
+          }
+        }
+      }
+
+      const total = topicProblems.length > 0 ? topicProblems.length : 25;
+      return {
+        id: def.id,
+        name: def.name,
+        category: def.category,
+        total,
+        solved: solvedCount
+      };
+    });
 
     // Dynamic difficulty calculation
     const easy = lc.easy || 0;
@@ -152,7 +220,7 @@ router.get('/', async (req, res) => {
         medium,
         hard
       },
-      topics: defaultDSAData.topics,
+      topics: dynamicTopics,
       sheets: defaultDSAData.sheets,
       problems: combinedProblems
     });

@@ -15,7 +15,9 @@ import {
   Trophy, 
   Activity, 
   X,
-  Share2
+  Share2,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { MetricCard } from '../components/common/MetricCard';
 import { ProgressBar } from '../components/common/ProgressBar';
@@ -32,7 +34,9 @@ import {
   isProblemSolved,
   toggleCanonicalSolvedState,
   matchProblem,
-  migrateLegacySolvedMaps
+  migrateLegacySolvedMaps,
+  getTopicMasteryStats,
+  getCanonicalKey
 } from '../utils/curatedSheetsManager';
 import { striverSdeSheet } from '../data/striverSdeSheet';
 import { blind75Sheet } from '../data/blind75Sheet';
@@ -60,6 +64,7 @@ export function DSA({ dsaHook }) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedSheetId, setSelectedSheetId] = useState(null); // 'all_unique' | 'striver_sde' | 'blind_75' | 'neetcode_150' | 'cp_essentials' | null
   const [curatedSearchQuery, setCuratedSearchQuery] = useState('');
+  const [expandedTopicId, setExpandedTopicId] = useState(null);
 
   // Synchronized Canonical Solved Map across all sheets
   const [canonicalSolvedMap, setCanonicalSolvedMap] = useLocalCache(CANONICAL_STORAGE_KEY, {});
@@ -89,6 +94,60 @@ export function DSA({ dsaHook }) {
     const list = sheetProblemsMap[sheetId] || [];
     return getSheetSolvedCount(list, canonicalSolvedMap);
   };
+
+  // Merged problems: custom manual problems + any solved curated problems
+  const mergedProblems = useMemo(() => {
+    const list = [...(allProblems || [])];
+    const seenKeys = new Set(list.map(p => getCanonicalKey(p) || p.title?.toLowerCase()));
+
+    for (const prob of ALL_UNIQUE_PROBLEMS) {
+      if (isProblemSolved(prob, canonicalSolvedMap)) {
+        const key = prob.canonicalKey;
+        if (!seenKeys.has(key)) {
+          seenKeys.add(key);
+          list.unshift({
+            id: prob.id || `curated_${key}`,
+            title: prob.title,
+            platform: prob.platform,
+            difficulty: prob.difficulty,
+            topic: prob.topic,
+            url: prob.problemUrl,
+            status: 'Solved',
+            revisionStatus: 'Done',
+            revisionInterval: '7d',
+            lastReviewed: new Date().toISOString().split('T')[0],
+            notes: `Solved via Curated Sheets (${prob.sheets?.map(s => s.sheetName).join(', ') || 'PrepStack'})`,
+            canonicalKey: key
+          });
+        }
+      }
+    }
+
+    return list;
+  }, [allProblems, canonicalSolvedMap]);
+
+  // Filtered merged problems for Tab 1
+  const filteredMergedProblems = useMemo(() => {
+    return mergedProblems.filter(p => {
+      if (filters.topic !== 'All' && p.topic !== filters.topic) return false;
+      if (filters.difficulty !== 'All' && p.difficulty !== filters.difficulty) return false;
+      if (filters.platform !== 'All' && p.platform !== filters.platform) return false;
+      if (filters.status !== 'All' && p.status !== filters.status && p.revisionStatus !== filters.status) return false;
+      if (filters.search && filters.search.trim() !== '') {
+        const query = filters.search.toLowerCase();
+        const matchTitle = p.title?.toLowerCase().includes(query);
+        const matchTopic = p.topic?.toLowerCase().includes(query);
+        const matchNotes = p.notes?.toLowerCase().includes(query);
+        if (!matchTitle && !matchTopic && !matchNotes) return false;
+      }
+      return true;
+    });
+  }, [mergedProblems, filters]);
+
+  // Dynamic Topic Mastery Stats calculated from canonical solved problems & manual problems
+  const dynamicTopicMastery = useMemo(() => {
+    return getTopicMasteryStats(canonicalSolvedMap, mergedProblems);
+  }, [canonicalSolvedMap, mergedProblems]);
 
   // New problem form state
   const [newTitle, setNewTitle] = useState('');
@@ -134,6 +193,34 @@ export function DSA({ dsaHook }) {
     setShowAddModal(false);
   };
 
+  const handleUpdateMergedProblem = async (problem, changes) => {
+    // If problem is from curated sheet, update canonical solved state
+    if (problem.canonicalKey || problem.id?.startsWith('curated_') || ALL_UNIQUE_PROBLEMS.some(u => u.title?.toLowerCase() === problem.title?.toLowerCase())) {
+      if (changes.status !== undefined) {
+        setCanonicalSolvedMap(prev => toggleCanonicalSolvedState(problem, prev));
+      }
+    }
+
+    if (problem.id?.startsWith('curated_')) {
+      // If user is editing interval or notes on a curated item, persist to problem store
+      if (changes.revisionInterval || changes.revisionStatus || changes.notes) {
+        await addProblem({
+          title: problem.title,
+          platform: problem.platform,
+          difficulty: problem.difficulty,
+          topic: problem.topic,
+          url: problem.url || problem.problemUrl,
+          notes: changes.notes || problem.notes,
+          revisionInterval: changes.revisionInterval || problem.revisionInterval || '7d',
+          revisionStatus: changes.revisionStatus || (changes.revisionInterval === 'mastered' ? 'Mastered' : 'Done'),
+          status: changes.status || problem.status || 'Solved'
+        });
+      }
+    } else {
+      updateProblem(problem.id, changes);
+    }
+  };
+
   return (
     <div className="space-y-6 animate-fadeIn font-sans">
       {/* Header & Stats Banner */}
@@ -170,10 +257,12 @@ export function DSA({ dsaHook }) {
             Total Solved
           </span>
           <span className="text-2xl sm:text-3xl font-extrabold font-display text-black mt-1 block">
-            {stats.totalSolved ?? 0}
+            {Math.max(stats.totalSolved || 0, uniqueStats.solvedUnique || 0)}
           </span>
           <span className="text-[10px] text-emerald-700 font-mono font-semibold">
-            {stats.totalSolved > 0 ? 'Verified Platform Solves' : 'No Solves Recorded'}
+            {uniqueStats.solvedUnique > 0 || stats.totalSolved > 0
+              ? `${uniqueStats.solvedUnique} / 365 Sheet • ${stats.totalSolved || 0} Platform`
+              : 'No Solves Recorded'}
           </span>
         </div>
 
@@ -226,7 +315,7 @@ export function DSA({ dsaHook }) {
               : 'border-transparent text-black/40 hover:text-black'
           }`}
         >
-          My Problems ({problems.length})
+          My Problems ({mergedProblems.length})
         </button>
 
         <button
@@ -280,6 +369,20 @@ export function DSA({ dsaHook }) {
             </div>
 
             <div className="flex flex-wrap items-center gap-2 font-mono">
+              {/* Topic Filter */}
+              <select
+                value={filters.topic}
+                onChange={(e) => setFilterTopic(e.target.value)}
+                className="px-3 py-2 rounded-xl bg-[#F4F4F0] border border-black/15 text-black font-medium focus:outline-none focus:border-black"
+              >
+                <option value="All">All Topics</option>
+                {dynamicTopicMastery.map((t) => (
+                  <option key={t.id} value={t.name}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+
               {/* Platform Filter */}
               <select
                 value={filters.platform}
@@ -289,6 +392,8 @@ export function DSA({ dsaHook }) {
                 <option value="All">All Platforms</option>
                 <option value="LeetCode">LeetCode</option>
                 <option value="Codeforces">Codeforces</option>
+                <option value="GeeksforGeeks">GeeksforGeeks</option>
+                <option value="Coding Ninjas">Coding Ninjas</option>
                 <option value="AtCoder">AtCoder</option>
                 <option value="HackerRank">HackerRank</option>
               </select>
@@ -317,17 +422,32 @@ export function DSA({ dsaHook }) {
                 <option value="Due">Revision Due</option>
                 <option value="Mastered">Mastered</option>
               </select>
+
+              {(filters.topic !== 'All' || filters.platform !== 'All' || filters.difficulty !== 'All' || filters.status !== 'All' || filters.search) && (
+                <button
+                  onClick={() => {
+                    setFilterTopic('All');
+                    setFilterPlatform('All');
+                    setFilterDifficulty('All');
+                    setFilterStatus('All');
+                    setSearchQuery('');
+                  }}
+                  className="px-2.5 py-1.5 rounded-xl border border-black/20 bg-black/5 hover:bg-black/10 text-[11px] font-bold text-black transition-colors"
+                >
+                  Clear Filters
+                </button>
+              )}
             </div>
           </div>
 
           {/* Table */}
-          {problems.length === 0 ? (
+          {filteredMergedProblems.length === 0 ? (
             <EmptyState
               icon={Code2}
-              title={allProblems.length === 0 ? "No problems tracked yet" : "No problems found matching criteria"}
+              title={mergedProblems.length === 0 ? "No problems tracked yet" : "No problems found matching criteria"}
               description={
-                allProblems.length === 0
-                  ? "Track a problem using the 'Track New Problem' button, or link your LeetCode / Codeforces handle to import recent submissions."
+                mergedProblems.length === 0
+                  ? "Track a problem using the 'Track New Problem' button, or mark questions as solved in Curated Sheets."
                   : "Try adjusting your search query or filters, or add a new problem to your tracker."
               }
               actionText="Track New Problem"
@@ -348,7 +468,7 @@ export function DSA({ dsaHook }) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-black/10 font-medium text-black/80">
-                  {problems.map((p) => (
+                  {filteredMergedProblems.map((p) => (
                     <tr key={p.id} className="hover:bg-black/5 transition-colors">
                       <td className="py-3.5 px-4 max-w-xs">
                         <div className="flex items-center gap-1.5">
@@ -360,7 +480,7 @@ export function DSA({ dsaHook }) {
                               href={p.url}
                               target="_blank"
                               rel="noreferrer"
-                              className="text-black/40 hover:text-black"
+                              className="text-black/40 hover:text-black shrink-0"
                             >
                               <ExternalLink className="w-3 h-3" />
                             </a>
@@ -384,11 +504,12 @@ export function DSA({ dsaHook }) {
                       <td className="py-3.5 px-4">
                         <button
                           onClick={() =>
-                            updateProblem(p.id, {
+                            handleUpdateMergedProblem(p, {
                               status: p.status === 'Solved' ? 'Unsolved' : 'Solved'
                             })
                           }
                           className="focus:outline-none"
+                          title="Click to toggle Solved status"
                         >
                           <StatusBadge status={p.status} />
                         </button>
@@ -398,7 +519,7 @@ export function DSA({ dsaHook }) {
                         <select
                           value={p.revisionInterval || '7d'}
                           onChange={(e) =>
-                            updateProblem(p.id, {
+                            handleUpdateMergedProblem(p, {
                               revisionInterval: e.target.value,
                               revisionStatus: e.target.value === 'mastered' ? 'Mastered' : 'Due'
                             })
@@ -416,7 +537,7 @@ export function DSA({ dsaHook }) {
                       <td className="py-3.5 px-4">
                         <button
                           onClick={() =>
-                            updateProblem(p.id, {
+                            handleUpdateMergedProblem(p, {
                               revisionStatus: p.revisionStatus === 'Done' ? 'Due' : 'Done'
                             })
                           }
@@ -903,29 +1024,149 @@ export function DSA({ dsaHook }) {
 
       {/* TAB 4: Topic Mastery */}
       {activeTab === 'topics' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {topics.map((t) => (
-            <div key={t.id} className="p-5 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_rgba(0,0,0,1)] space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-black font-display">{t.name}</span>
-                <span className="text-[10px] font-mono uppercase text-black/60 px-2 py-0.5 rounded-lg bg-[#F4F4F0] border border-black/10 font-bold">
-                  {t.category}
-                </span>
-              </div>
-              <ProgressBar
-                value={t.solved}
-                max={t.total}
-                subLabel={`${t.solved} / ${t.total}`}
-                color={
-                  Math.round((t.solved / t.total) * 100) >= 70
-                    ? 'emerald'
-                    : Math.round((t.solved / t.total) * 100) >= 45
-                    ? 'blue'
-                    : 'amber'
-                }
-              />
+        <div className="space-y-6">
+          <div className="p-4 sm:p-5 rounded-2xl bg-[#F4F4F0] border-2 border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-bold text-black font-display uppercase tracking-wide">
+                Topic-Wise Curriculum & Mastery
+              </h2>
+              <p className="text-xs text-black/60 font-medium">
+                Live mastery progress across 13 core DSA topics based on your verified platform solves and 365 unique curated problems.
+              </p>
             </div>
-          ))}
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-mono font-bold px-3 py-1.5 rounded-xl bg-white border border-black/20 text-black shadow-xs">
+                {uniqueStats.solvedUnique} / 365 Unique Solved ({uniqueStats.percent}%)
+              </span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {dynamicTopicMastery.map((t) => {
+              const isExpanded = expandedTopicId === t.id;
+              const pct = t.percent;
+              const color = pct >= 70 ? 'emerald' : pct >= 40 ? 'blue' : 'amber';
+              const badgeBg = pct >= 70 
+                ? 'bg-emerald-50 text-emerald-800 border-emerald-300' 
+                : pct >= 40 
+                ? 'bg-blue-50 text-blue-800 border-blue-300' 
+                : 'bg-amber-50 text-amber-800 border-amber-300';
+
+              return (
+                <div
+                  key={t.id}
+                  className={`p-5 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_rgba(0,0,0,1)] space-y-3.5 transition-all ${
+                    isExpanded ? 'md:col-span-2 lg:col-span-3 ring-2 ring-black' : ''
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <span className="text-sm font-bold text-black font-display block">{t.name}</span>
+                      <span className="text-[10px] font-mono uppercase text-black/50 font-bold">
+                        {t.category}
+                      </span>
+                    </div>
+                    <span className={`text-[11px] font-mono font-bold px-2.5 py-0.5 rounded-lg border ${badgeBg}`}>
+                      {t.solved} / {t.total} ({pct}%)
+                    </span>
+                  </div>
+
+                  <ProgressBar
+                    value={t.solved}
+                    max={t.total}
+                    subLabel={`${t.solved} of ${t.total} problems mastered`}
+                    color={color}
+                  />
+
+                  {/* Actions: View Questions toggle & Filter in My Problems */}
+                  <div className="flex items-center justify-between pt-2 border-t border-black/10 text-xs font-mono">
+                    <button
+                      onClick={() => setExpandedTopicId(isExpanded ? null : t.id)}
+                      className="text-black/70 hover:text-black font-bold flex items-center gap-1 hover:underline"
+                    >
+                      {isExpanded ? (
+                        <>
+                          <ChevronUp className="w-3.5 h-3.5" />
+                          <span>Hide Problems</span>
+                        </>
+                      ) : (
+                        <>
+                          <ChevronDown className="w-3.5 h-3.5" />
+                          <span>View {t.problems.length} Problems</span>
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setFilterTopic(t.name);
+                        setActiveTab('problems');
+                      }}
+                      className="text-[11px] text-blue-600 hover:text-blue-800 font-bold hover:underline flex items-center gap-1"
+                    >
+                      Filter in My Problems &rarr;
+                    </button>
+                  </div>
+
+                  {/* Expanded Problem List for this Topic */}
+                  {isExpanded && (
+                    <div className="pt-3 border-t border-black/15 space-y-2 max-h-96 overflow-y-auto pr-1">
+                      <div className="text-[11px] font-mono text-black/50 font-semibold mb-2">
+                        Questions in {t.name} ({t.problems.length} total • {t.solved} solved):
+                      </div>
+                      <div className="divide-y divide-black/10">
+                        {t.problems.map((prob) => {
+                          const isSolved = isProblemSolved(prob, canonicalSolvedMap);
+                          return (
+                            <div
+                              key={prob.canonicalKey || prob.id}
+                              className={`py-2 px-2.5 rounded-lg flex items-center justify-between gap-3 text-xs transition-colors ${
+                                isSolved ? 'bg-emerald-50/50' : 'hover:bg-black/5'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                <button
+                                  onClick={() => setCanonicalSolvedMap(prev => toggleCanonicalSolvedState(prob, prev))}
+                                  className="shrink-0 text-black/30 hover:text-emerald-600 transition-colors"
+                                  title={isSolved ? 'Mark as Unsolved across all sheets' : 'Mark as Solved across all sheets'}
+                                >
+                                  {isSolved ? (
+                                    <CheckCircle2 className="w-4 h-4 text-emerald-600 fill-emerald-100" />
+                                  ) : (
+                                    <Circle className="w-4 h-4 text-black/30 hover:text-black/60" />
+                                  )}
+                                </button>
+                                <span className={`font-medium truncate ${isSolved ? 'line-through text-black/40' : 'text-black'}`}>
+                                  {prob.title}
+                                </span>
+                              </div>
+
+                              <div className="flex items-center gap-2 shrink-0 font-mono text-[10px]">
+                                <DifficultyBadge difficulty={prob.difficulty} />
+                                <span className="px-1.5 py-0.5 rounded bg-black/5 text-black/60">
+                                  {prob.platform}
+                                </span>
+                                {prob.problemUrl && (
+                                  <a
+                                    href={prob.problemUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="p-1 rounded bg-black hover:bg-neutral-800 text-white flex items-center gap-1 font-bold px-2"
+                                  >
+                                    Solve <ExternalLink className="w-2.5 h-2.5" />
+                                  </a>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
