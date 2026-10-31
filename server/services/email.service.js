@@ -268,10 +268,17 @@ export async function sendEmail({ to, subject, html, text }) {
       const fromAddress = `PrepStack <${process.env.SMTP_USER}>`;
       const info = await smtpTransporter.sendMail({
         from: fromAddress,
+        replyTo: process.env.SMTP_USER,
         to,
         subject,
         html,
-        text: text || subject
+        text: text || subject,
+        headers: {
+          'X-Entity-Ref-ID': `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          'X-Auto-Response-Suppress': 'OOF, AutoReply',
+          'Importance': 'high',
+          'Priority': 'urgent'
+        }
       });
       console.log(`[Email Service] ✅ Live email successfully delivered via Gmail SMTP to ${to} (Message ID: ${info.messageId})`);
       return {
@@ -447,7 +454,8 @@ export async function sendVerificationEmail({ email, code, name }) {
   const cleanEmail = email.trim().toLowerCase();
   const displayName = name ? name.trim() : cleanEmail.split('@')[0];
 
-  const subject = `${code} is your PrepStack verification code`;
+  const subject = `Your PrepStack Verification Code: ${code}`;
+  const text = `Hello ${displayName},\n\nYour 6-digit PrepStack verification code is: ${code}\n\nThis verification code expires in 15 minutes.\n\nEnter this code on the verification screen to activate your account.\n\nIf you did not initiate this registration, please disregard this email.\n\nPrepStack Technologies - Developer Portfolio & Technical Placement Readiness Engine\nhttps://placement-preparation-dashboard-five.vercel.app`;
   const content = `
     <div class="badge">Email Verification</div>
     <h1>Verify your email address</h1>
@@ -469,7 +477,7 @@ export async function sendVerificationEmail({ email, code, name }) {
   `;
 
   const html = getEmailWrapper('Verify Your Email - PrepStack', content);
-  return sendEmail({ to: cleanEmail, subject, html });
+  return sendEmail({ to: cleanEmail, subject, html, text });
 }
 
 /**
@@ -479,7 +487,8 @@ export async function sendPasswordResetEmail({ email, code, name }) {
   const cleanEmail = email.trim().toLowerCase();
   const displayName = name ? name.trim() : cleanEmail.split('@')[0];
 
-  const subject = `${code} is your PrepStack password reset code`;
+  const subject = `Reset Your PrepStack Password: ${code}`;
+  const text = `Hello ${displayName},\n\nWe received a request to reset your PrepStack password. Your 6-digit verification code is:\n\n${code}\n\nThis security code expires in 15 minutes.\n\nIf you did not request a password reset, you can safely disregard this message.\n\nPrepStack Technologies\nhttps://placement-preparation-dashboard-five.vercel.app`;
   const content = `
     <div class="badge">Security &bull; Password Reset</div>
     <h1>Reset your PrepStack password</h1>
@@ -502,5 +511,5 @@ export async function sendPasswordResetEmail({ email, code, name }) {
   `;
 
   const html = getEmailWrapper('Reset Password - PrepStack', content);
-  return sendEmail({ to: cleanEmail, subject, html });
+  return sendEmail({ to: cleanEmail, subject, html, text });
 }

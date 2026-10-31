@@ -77,6 +77,7 @@ export function Login({ onLogin }) {
   const [regVerifySuccess, setRegVerifySuccess] = useState('');
   const [regCooldown, setRegCooldown] = useState(0);
   const [testOtpNotice, setTestOtpNotice] = useState('');
+  const [deliveryMode, setDeliveryMode] = useState('');
 
   // Forgot Password Modal State
   const [showForgotModal, setShowForgotModal] = useState(false);
@@ -272,13 +273,16 @@ export function Login({ onLogin }) {
       if (res.ok && data.success) {
         setRegCooldown(data.cooldownSeconds || 30);
         setTestOtpNotice(data.testOtp || '');
+        setDeliveryMode(data.emailResult?.mode || (data.sandboxMode ? 'sandbox' : 'smtp'));
         if (data.sandboxMode || !data.emailResult?.delivered) {
           setRegVerifyCode(data.testOtp || '');
           setRegVerifySuccess(
             `Resend Sandbox: Verification code auto-filled [${data.testOtp}]. ${data.forwardedToOwner ? '(Notification copy sent to admin)' : ''}`
           );
         } else {
-          setRegVerifySuccess(`Verification code sent to ${cleanEmail}. Check your inbox or spam.`);
+          setRegVerifySuccess(
+            `Verification email dispatched to ${cleanEmail}! If using Outlook, please check your Junk Email folder or the "Other" tab.`
+          );
         }
         setRegVerifyError('');
         setShowRegVerifyModal(true);
@@ -879,22 +883,46 @@ export function Login({ onLogin }) {
             )}
 
             {testOtpNotice && (
-              <div className="p-3 rounded-xl bg-amber-50/90 border border-amber-200/80 text-xs text-amber-950 space-y-2">
+              <div className={`p-3 rounded-xl border text-xs space-y-2 ${
+                deliveryMode === 'smtp' 
+                  ? 'bg-blue-50/90 border-blue-200/80 text-blue-950' 
+                  : 'bg-amber-50/90 border-amber-200/80 text-amber-950'
+              }`}>
                 <div className="flex items-center justify-between font-semibold">
-                  <span className="flex items-center gap-1.5 text-amber-800 text-[11px]">
-                    <ShieldCheck className="w-3.5 h-3.5 text-amber-600" />
-                    Resend Sandbox Active
+                  <span className={`flex items-center gap-1.5 text-[11px] ${
+                    deliveryMode === 'smtp' ? 'text-blue-800' : 'text-amber-800'
+                  }`}>
+                    {deliveryMode === 'smtp' ? (
+                      <MailCheck className="w-3.5 h-3.5 text-blue-600" />
+                    ) : (
+                      <ShieldCheck className="w-3.5 h-3.5 text-amber-600" />
+                    )}
+                    {deliveryMode === 'smtp' ? 'Live Email Dispatched via Gmail' : 'Resend Sandbox Active'}
                   </span>
                   <button
                     type="button"
                     onClick={() => setRegVerifyCode(testOtpNotice)}
-                    className="text-[10px] font-bold text-amber-900 bg-amber-200/80 hover:bg-amber-300/80 px-2 py-0.5 rounded-md cursor-pointer transition-colors"
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded-md cursor-pointer transition-colors ${
+                      deliveryMode === 'smtp'
+                        ? 'text-blue-900 bg-blue-100 hover:bg-blue-200'
+                        : 'text-amber-900 bg-amber-200/80 hover:bg-amber-300/80'
+                    }`}
                   >
                     Auto-fill: {testOtpNotice}
                   </button>
                 </div>
-                <p className="text-[11px] text-amber-800/90 leading-relaxed font-normal">
-                  Resend free sandbox domain (<code className="bg-amber-100 px-1 py-0.5 rounded text-amber-900 text-[10px]">onboarding@resend.dev</code>) restricts external emails. We've auto-filled your 6-digit code below so you can verify immediately!
+                <p className={`text-[11px] leading-relaxed font-normal ${
+                  deliveryMode === 'smtp' ? 'text-blue-800/90' : 'text-amber-800/90'
+                }`}>
+                  {deliveryMode === 'smtp' ? (
+                    <>
+                      Sent to <strong>{email}</strong>. Microsoft Outlook often places incoming automated emails in the <strong>Junk Email</strong> folder or the <strong>"Other"</strong> tab. You can also click <strong>Auto-fill</strong> above to verify instantly!
+                    </>
+                  ) : (
+                    <>
+                      Resend free sandbox domain (<code className="bg-amber-100 px-1 py-0.5 rounded text-amber-900 text-[10px]">onboarding@resend.dev</code>) restricts external emails. We've auto-filled your 6-digit code below so you can verify immediately!
+                    </>
+                  )}
                 </p>
               </div>
             )}
