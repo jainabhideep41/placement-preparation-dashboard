@@ -272,9 +272,15 @@ export function Login({ onLogin }) {
       if (res.ok && data.success) {
         setRegCooldown(data.cooldownSeconds || 30);
         setTestOtpNotice(data.testOtp || '');
-        setRegVerifySuccess(`Verification code sent to ${cleanEmail}. Check your inbox or spam.`);
+        if (data.sandboxMode || !data.emailResult?.delivered) {
+          setRegVerifyCode(data.testOtp || '');
+          setRegVerifySuccess(
+            `Resend Sandbox: Verification code auto-filled [${data.testOtp}]. ${data.forwardedToOwner ? '(Notification copy sent to admin)' : ''}`
+          );
+        } else {
+          setRegVerifySuccess(`Verification code sent to ${cleanEmail}. Check your inbox or spam.`);
+        }
         setRegVerifyError('');
-        setRegVerifyCode('');
         setShowRegVerifyModal(true);
       } else {
         setError(data.message || 'Failed to dispatch verification email');
@@ -373,7 +379,12 @@ export function Login({ onLogin }) {
       if (res.ok && data.success) {
         setRegCooldown(data.cooldownSeconds || 30);
         setTestOtpNotice(data.testOtp || '');
-        setRegVerifySuccess(`New verification code sent to ${cleanEmail}!`);
+        if (data.sandboxMode || !data.emailResult?.delivered) {
+          setRegVerifyCode(data.testOtp || '');
+          setRegVerifySuccess(`New verification code generated & auto-filled: ${data.testOtp}`);
+        } else {
+          setRegVerifySuccess(`New verification code sent to ${cleanEmail}!`);
+        }
       } else {
         setRegVerifyError(data.message || 'Failed to resend code');
         if (data.remainingCooldown) setRegCooldown(data.remainingCooldown);
@@ -411,7 +422,12 @@ export function Login({ onLogin }) {
       if (res.ok && data.success) {
         setForgotCooldown(data.cooldownSeconds || 30);
         setForgotTestOtp(data.testOtp || '');
-        setForgotSuccess(`Password reset code sent to ${targetEmail}. Check your inbox.`);
+        if (data.sandboxMode || !data.emailResult?.delivered) {
+          setForgotCode(data.testOtp || '');
+          setForgotSuccess(`Sandbox mode: Reset code auto-filled [${data.testOtp}]`);
+        } else {
+          setForgotSuccess(`Password reset code sent to ${targetEmail}. Check your inbox.`);
+        }
         setForgotStep(2);
       } else {
         setForgotError(data.message || 'Failed to dispatch reset code');
@@ -510,7 +526,11 @@ export function Login({ onLogin }) {
 
       const data = await res.json();
       if (res.ok && data.success) {
-        setResendMessage(`Verification email sent to ${targetEmail}! Code: ${data.testOtp || 'sent to inbox'}`);
+        setResendMessage(
+          data.emailResult?.delivered
+            ? `Verification email delivered to ${targetEmail}!`
+            : `Code generated for ${targetEmail}: ${data.testOtp || ''} (Resend sandbox mode: code auto-available)`
+        );
         setResendCooldown(data.cooldownSeconds || 30);
       } else {
         setResendError(data.message || 'Failed to dispatch email');
@@ -859,11 +879,23 @@ export function Login({ onLogin }) {
             )}
 
             {testOtpNotice && (
-              <div className="p-2.5 rounded-lg bg-gray-50 border border-dashed border-gray-300 text-[11px] text-gray-600 flex items-center justify-between">
-                <span>Code for test / review:</span>
-                <span className="font-mono font-bold tracking-widest text-black bg-white px-2 py-0.5 rounded border border-gray-200">
-                  {testOtpNotice}
-                </span>
+              <div className="p-3 rounded-xl bg-amber-50/90 border border-amber-200/80 text-xs text-amber-950 space-y-2">
+                <div className="flex items-center justify-between font-semibold">
+                  <span className="flex items-center gap-1.5 text-amber-800 text-[11px]">
+                    <ShieldCheck className="w-3.5 h-3.5 text-amber-600" />
+                    Resend Sandbox Active
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setRegVerifyCode(testOtpNotice)}
+                    className="text-[10px] font-bold text-amber-900 bg-amber-200/80 hover:bg-amber-300/80 px-2 py-0.5 rounded-md cursor-pointer transition-colors"
+                  >
+                    Auto-fill: {testOtpNotice}
+                  </button>
+                </div>
+                <p className="text-[11px] text-amber-800/90 leading-relaxed font-normal">
+                  Resend free sandbox domain (<code className="bg-amber-100 px-1 py-0.5 rounded text-amber-900 text-[10px]">onboarding@resend.dev</code>) restricts external emails. We've auto-filled your 6-digit code below so you can verify immediately!
+                </p>
               </div>
             )}
 
@@ -968,11 +1000,23 @@ export function Login({ onLogin }) {
             )}
 
             {forgotTestOtp && forgotStep === 2 && (
-              <div className="p-2.5 rounded-lg bg-gray-50 border border-dashed border-gray-300 text-[11px] text-gray-600 flex items-center justify-between">
-                <span>Code for test / review:</span>
-                <span className="font-mono font-bold tracking-widest text-black bg-white px-2 py-0.5 rounded border border-gray-200">
-                  {forgotTestOtp}
-                </span>
+              <div className="p-3 rounded-xl bg-amber-50/90 border border-amber-200/80 text-xs text-amber-950 space-y-2">
+                <div className="flex items-center justify-between font-semibold">
+                  <span className="flex items-center gap-1.5 text-amber-800 text-[11px]">
+                    <KeyRound className="w-3.5 h-3.5 text-amber-600" />
+                    Resend Sandbox Active
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setForgotCode(forgotTestOtp)}
+                    className="text-[10px] font-bold text-amber-900 bg-amber-200/80 hover:bg-amber-300/80 px-2 py-0.5 rounded-md cursor-pointer transition-colors"
+                  >
+                    Auto-fill: {forgotTestOtp}
+                  </button>
+                </div>
+                <p className="text-[11px] text-amber-800/90 leading-relaxed font-normal">
+                  Resend sandbox mode auto-filled your code below ({forgotTestOtp}) so you can reset your password immediately.
+                </p>
               </div>
             )}
 

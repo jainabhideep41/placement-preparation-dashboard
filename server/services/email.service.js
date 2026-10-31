@@ -291,6 +291,7 @@ export async function sendEmail({ to, subject, html, text }) {
   const apiKey = RESEND_API_KEY;
   let liveDelivered = false;
   let resendDetails = null;
+  let forwardedToOwner = false;
 
   if (apiKey) {
     try {
@@ -318,9 +319,43 @@ export async function sendEmail({ to, subject, html, text }) {
       } else {
         resendDetails = data;
         if (data?.statusCode === 403 || data?.name === 'validation_error') {
-          console.warn(`[Email Service] ⚠️ Resend Sandbox Policy Blocked Delivery:`);
+          console.warn(`[Email Service] ⚠️ Resend Sandbox Policy Blocked Delivery to ${to}:`);
           console.warn(`  Resend's free test domain (onboarding@resend.dev) ONLY allows sending to your account email (abhideepjain39@gmail.com).`);
-          console.warn(`  It rejected delivery to external recipient '${to}'. To deliver to all users, add a domain at resend.com/domains or configure Gmail SMTP.`);
+          
+          // Forward a copy to the owner's registered inbox so the owner receives the verification code
+          if (to.toLowerCase() !== 'abhideepjain39@gmail.com') {
+            try {
+              console.log(`[Email Service] 🔄 Forwarding code notification to owner abhideepjain39@gmail.com...`);
+              const forwardRes = await fetch('https://api.resend.com/emails', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${apiKey}`
+                },
+                body: JSON.stringify({
+                  from: fromAddress,
+                  to: ['abhideepjain39@gmail.com'],
+                  subject: `[PrepStack Auth for ${to}] ${subject}`,
+                  html: `
+                    <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:12px 16px;margin-bottom:18px;font-family:sans-serif;font-size:13px;color:#92400e;">
+                      <strong>⚠️ Resend Sandbox Forward:</strong><br/>
+                      A student with email <code>${to}</code> initiated an authentication action.<br/>
+                      Because Resend's free test domain (<code>onboarding@resend.dev</code>) only delivers to your account, this copy was delivered to your inbox.
+                    </div>
+                    ${html}
+                  `,
+                  text: `Forwarded verification code for ${to}: ${text || subject}`
+                })
+              });
+              const forwardData = await forwardRes.json();
+              if (forwardRes.ok && forwardData?.id) {
+                forwardedToOwner = true;
+                console.log(`[Email Service] ✅ Forwarded copy successfully delivered to abhideepjain39@gmail.com (ID: ${forwardData.id})`);
+              }
+            } catch (fErr) {
+              console.warn(`[Email Service] Could not forward to owner:`, fErr.message);
+            }
+          }
         } else {
           console.warn(`[Email Service] ⚠️ Resend response:`, data);
         }
@@ -335,10 +370,11 @@ export async function sendEmail({ to, subject, html, text }) {
   return {
     success: true,
     delivered: liveDelivered,
-    mode: liveDelivered ? 'live' : 'simulation',
+    mode: liveDelivered ? 'live' : 'sandbox',
     recipient: to,
     subject,
-    resendDetails
+    resendDetails,
+    forwardedToOwner
   };
 }
 

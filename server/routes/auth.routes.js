@@ -430,9 +430,13 @@ router.post('/register-request', async (req, res) => {
 
   res.json({
     success: true,
-    message: `Verification code sent to ${cleanEmail}. Please check your inbox or spam folder.`,
+    message: emailResult.delivered
+      ? `Verification code sent to ${cleanEmail}. Please check your inbox or spam folder.`
+      : `Verification code generated for ${cleanEmail}. Resend sandbox mode active.`,
     cooldownSeconds: 30,
     testOtp: code,
+    sandboxMode: !emailResult.delivered,
+    forwardedToOwner: Boolean(emailResult.forwardedToOwner),
     emailResult
   });
 });
@@ -550,9 +554,13 @@ router.post('/forgot-password-request', async (req, res) => {
 
   res.json({
     success: true,
-    message: `Password reset code sent to ${cleanEmail}. Check your inbox.`,
+    message: emailResult.delivered
+      ? `Password reset code sent to ${cleanEmail}. Check your inbox.`
+      : `Password reset code generated for ${cleanEmail}. Resend sandbox mode active.`,
     cooldownSeconds: 30,
     testOtp: code,
+    sandboxMode: !emailResult.delivered,
+    forwardedToOwner: Boolean(emailResult.forwardedToOwner),
     emailResult
   });
 });
@@ -664,17 +672,23 @@ router.post('/resend-verification', async (req, res) => {
   const user = getUserByEmail(cleanEmail);
   const name = user?.name || cleanEmail.split('@')[0];
 
+  let emailResult;
   if (type === 'forgot_password') {
-    await sendPasswordResetEmail({ email: cleanEmail, code, name });
+    emailResult = await sendPasswordResetEmail({ email: cleanEmail, code, name });
   } else {
-    await sendVerificationEmail({ email: cleanEmail, code, name });
+    emailResult = await sendVerificationEmail({ email: cleanEmail, code, name });
   }
 
   res.json({
     success: true,
-    message: `Verification code sent to ${cleanEmail}. Check your inbox.`,
+    message: emailResult?.delivered
+      ? `Verification code sent to ${cleanEmail}. Check your inbox.`
+      : `Verification code generated for ${cleanEmail}. Resend sandbox mode active.`,
     cooldownSeconds: 30,
-    testOtp: code
+    testOtp: code,
+    sandboxMode: !emailResult?.delivered,
+    forwardedToOwner: Boolean(emailResult?.forwardedToOwner),
+    emailResult
   });
 });
 
