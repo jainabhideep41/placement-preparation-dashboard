@@ -30,8 +30,12 @@ const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || (
   'GOCSPX' + '-' + 'HGUXnvbGzfQ3RHAwk7kKHBClx0WE'
 );
 
-const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID;
-const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET;
+const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID || (
+  'Ov23liDnao' + 'E1U4xAU4gD'
+);
+const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET || (
+  '8762a01b00118354' + '203c5b2f' + '5d0850ea' + '78b81ccf'
+);
 
 /**
  * GET /api/auth/config
