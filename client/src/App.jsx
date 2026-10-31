@@ -40,7 +40,11 @@ export function App() {
   const handleLogin = (user) => {
     setCurrentUser(user);
     if (user.handles) {
-      setHandles(user.handles);
+      setHandles((prev) => ({
+        leetcode: user.handles.leetcode || prev?.leetcode || '',
+        codeforces: user.handles.codeforces || prev?.codeforces || '',
+        github: user.handles.github || prev?.github || ''
+      }));
     }
     // Clear stale caches so dashboard loads the student's fresh profile
     window.localStorage.removeItem('prep_dashboard_cache');

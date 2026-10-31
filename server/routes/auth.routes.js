@@ -30,6 +30,9 @@ const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || (
   'GOCSPX' + '-' + 'HGUXnvbGzfQ3RHAwk7kKHBClx0WE'
 );
 
+const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID;
+const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET;
+
 /**
  * GET /api/auth/config
  * Returns OAuth provider status so client knows if live keys are configured
@@ -43,8 +46,8 @@ router.get('/config', (req, res) => {
         clientId: GOOGLE_CLIENT_ID || null
       },
       github: {
-        configured: Boolean(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET),
-        clientId: process.env.GITHUB_CLIENT_ID || null
+        configured: Boolean(GITHUB_CLIENT_ID && GITHUB_CLIENT_SECRET),
+        clientId: GITHUB_CLIENT_ID || null
       }
     }
   });
@@ -55,14 +58,13 @@ router.get('/config', (req, res) => {
  * Initiates GitHub OAuth flow or redirects with status
  */
 router.get('/github', (req, res) => {
-  const clientId = process.env.GITHUB_CLIENT_ID;
-  if (!clientId || !process.env.GITHUB_CLIENT_SECRET) {
+  if (!GITHUB_CLIENT_ID || !GITHUB_CLIENT_SECRET) {
     // Redirect with prompt indicator so client opens interactive sign-in
     return res.redirect(`${getClientUrl(req)}/?oauth_info=github_unconfigured`);
   }
 
   const callbackUrl = `${getBaseUrl(req)}/api/auth/github/callback`;
-  const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(callbackUrl)}&scope=read:user,user:email`;
+  const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(callbackUrl)}&scope=read:user,user:email`;
   res.redirect(githubAuthUrl);
 });
 
@@ -87,8 +89,8 @@ router.get('/github/callback', async (req, res) => {
         Accept: 'application/json'
       },
       body: JSON.stringify({
-        client_id: process.env.GITHUB_CLIENT_ID,
-        client_secret: process.env.GITHUB_CLIENT_SECRET,
+        client_id: GITHUB_CLIENT_ID,
+        client_secret: GITHUB_CLIENT_SECRET,
         code
       })
     });
