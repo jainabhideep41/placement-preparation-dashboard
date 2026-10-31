@@ -19,7 +19,7 @@ import { ProgressBar } from '../components/common/ProgressBar';
 import { Badge, DifficultyBadge, StatusBadge } from '../components/common/Badge';
 import { LoadingSkeleton, EmptyState } from '../components/common/LoadingSkeleton';
 import { REVISION_INTERVALS } from '../utils/constants';
-import { StriverSheetViewer } from '../components/dsa/StriverSheetViewer';
+import { CuratedSheetViewer } from '../components/dsa/CuratedSheetViewer';
 import { useLocalCache } from '../hooks/useLocalCache';
 
 export function DSA({ dsaHook }) {
@@ -41,9 +41,28 @@ export function DSA({ dsaHook }) {
 
   const [activeTab, setActiveTab] = useState('problems'); // 'problems' | 'platforms' | 'sheets' | 'topics'
   const [showAddModal, setShowAddModal] = useState(false);
-  const [selectedSheetId, setSelectedSheetId] = useState(null); // 'striver_sde' | null
+  const [selectedSheetId, setSelectedSheetId] = useState(null); // 'striver_sde' | 'blind_75' | 'neetcode_150' | 'cp_essentials' | null
+
+  // Persistent Solved Maps for all 4 curated sheets
   const [striverSolvedMap] = useLocalCache('prep_striver_solved_map', {});
-  const striverSolvedCount = Object.keys(striverSolvedMap).filter(k => striverSolvedMap[k]).length;
+  const [blind75SolvedMap] = useLocalCache('prep_blind75_solved_map', {});
+  const [neetcode150SolvedMap] = useLocalCache('prep_neetcode150_solved_map', {});
+  const [cpSolvedMap] = useLocalCache('prep_cp_essentials_solved_map', {});
+
+  const getSheetSolvedCount = (id) => {
+    switch (id) {
+      case 'striver_sde':
+        return Object.keys(striverSolvedMap).filter(k => striverSolvedMap[k]).length;
+      case 'blind_75':
+        return Object.keys(blind75SolvedMap).filter(k => blind75SolvedMap[k]).length;
+      case 'neetcode_150':
+        return Object.keys(neetcode150SolvedMap).filter(k => neetcode150SolvedMap[k]).length;
+      case 'cp_essentials':
+        return Object.keys(cpSolvedMap).filter(k => cpSolvedMap[k]).length;
+      default:
+        return 0;
+    }
+  };
 
   // New problem form state
   const [newTitle, setNewTitle] = useState('');
@@ -580,8 +599,9 @@ export function DSA({ dsaHook }) {
 
       {/* TAB 3: Curated Sheets & Roadmaps */}
       {activeTab === 'sheets' && (
-        selectedSheetId === 'striver_sde' ? (
-          <StriverSheetViewer 
+        selectedSheetId ? (
+          <CuratedSheetViewer 
+            sheetId={selectedSheetId}
             onBack={() => setSelectedSheetId(null)} 
             onAddProblem={addProblem} 
           />
@@ -593,30 +613,25 @@ export function DSA({ dsaHook }) {
                   Placement Interview Sheets & Curated Roadmaps
                 </h2>
                 <p className="text-xs text-gray-500 mt-0.5">
-                  Select a curated challenge sheet to practice topic-wise questions with direct redirects to solve on LeetCode, GFG, and Coding Ninjas.
+                  Select a curated challenge sheet to practice topic-wise questions with direct redirects to solve on LeetCode, Codeforces, GFG, and Coding Ninjas.
                 </p>
               </div>
               <span className="text-[11px] font-mono text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full font-semibold self-start sm:self-auto">
-                ● 1 Live Interactive Sheet
+                ● 4 Live Interactive Sheets
               </span>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {sheets.map((sheet) => {
-                const isStriver = sheet.id === 'striver_sde';
-                const completed = isStriver ? striverSolvedCount : sheet.completedProblems;
+                const completed = getSheetSolvedCount(sheet.id);
                 const total = sheet.totalProblems;
-                const pct = Math.round((completed / total) * 100);
+                const pct = Math.round((completed / total) * 100) || 0;
 
                 return (
                   <div 
                     key={sheet.id} 
-                    onClick={() => isStriver && setSelectedSheetId('striver_sde')}
-                    className={`p-6 rounded-3xl bg-white border border-gray-200 shadow-xs space-y-4 transition-all ${
-                      isStriver 
-                        ? 'hover:border-black hover:shadow-md cursor-pointer relative group' 
-                        : ''
-                    }`}
+                    onClick={() => setSelectedSheetId(sheet.id)}
+                    className="p-6 rounded-3xl bg-white border border-gray-200 shadow-xs space-y-4 transition-all hover:border-black hover:shadow-md cursor-pointer relative group"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div>
@@ -624,15 +639,13 @@ export function DSA({ dsaHook }) {
                           <h3 className="text-sm font-bold text-gray-900 font-display group-hover:text-blue-600 transition-colors">
                             {sheet.title}
                           </h3>
-                          {isStriver && (
-                            <span className="text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded-full bg-emerald-600 text-white">
-                              Live Interactive
-                            </span>
-                          )}
+                          <span className="text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded-full bg-emerald-600 text-white">
+                            Live Interactive
+                          </span>
                         </div>
                         <p className="text-xs text-gray-500 mt-1">{sheet.description}</p>
                       </div>
-                      <Badge variant={isStriver ? 'blue' : 'neutral'}>{sheet.category}</Badge>
+                      <Badge variant="blue">{sheet.category}</Badge>
                     </div>
 
                     <ProgressBar
@@ -644,20 +657,16 @@ export function DSA({ dsaHook }) {
 
                     <div className="flex items-center justify-between text-xs text-gray-500 pt-2 border-t border-gray-100 font-mono">
                       <span>Remaining: <strong className="text-gray-900">{total - completed}</strong></span>
-                      {isStriver ? (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedSheetId('striver_sde');
-                          }}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-black text-white text-xs font-bold shadow-xs hover:bg-neutral-800 transition-all"
-                        >
-                          <span>Explore & Solve Sheet (180)</span>
-                          <span className="text-xs">→</span>
-                        </button>
-                      ) : (
-                        <span className="text-xs text-gray-400 font-medium">Coming Soon</span>
-                      )}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedSheetId(sheet.id);
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-black text-white text-xs font-bold shadow-xs hover:bg-neutral-800 transition-all"
+                      >
+                        <span>Explore & Solve ({total})</span>
+                        <span className="text-xs">→</span>
+                      </button>
                     </div>
                   </div>
                 );

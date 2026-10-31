@@ -1,6 +1,9 @@
 import { Router } from 'express';
 import { defaultDSAData } from '../data/seedData.js';
 import { striverSdeSheet } from '../data/striverSdeSheet.js';
+import { blind75Sheet } from '../data/blind75Sheet.js';
+import { neetcode150Sheet } from '../data/neetcode150Sheet.js';
+import { cpEssentialsSheet } from '../data/cpEssentialsSheet.js';
 import { getStoredProblems, addProblemToStore, updateProblemInStore } from '../data/problemStore.js';
 import { getCodeforcesStats } from '../services/dsa/codeforces.adapter.js';
 import { getLeetCodeStats } from '../services/dsa/leetcode.adapter.js';
@@ -8,6 +11,59 @@ import { getAtCoderStats } from '../services/dsa/atcoder.adapter.js';
 import { getHackerRankStats } from '../services/dsa/hackerrank.adapter.js';
 
 const router = Router();
+
+const SHEET_REGISTRY = {
+  striver_sde: {
+    sheet: {
+      id: 'striver_sde',
+      title: "Striver's SDE Sheet (180)",
+      description: "Standard 180 curated problems asked in top-tier tech placement interviews.",
+      totalProblems: 180,
+      category: "Interview Preparation"
+    },
+    problems: striverSdeSheet
+  },
+  striver: {
+    sheet: {
+      id: 'striver_sde',
+      title: "Striver's SDE Sheet (180)",
+      description: "Standard 180 curated problems asked in top-tier tech placement interviews.",
+      totalProblems: 180,
+      category: "Interview Preparation"
+    },
+    problems: striverSdeSheet
+  },
+  blind_75: {
+    sheet: {
+      id: 'blind_75',
+      title: "Blind 75 Essential DSA",
+      description: "The core 75 LeetCode problems covering all fundamental patterns.",
+      totalProblems: 75,
+      category: "Patterns"
+    },
+    problems: blind75Sheet
+  },
+  neetcode_150: {
+    sheet: {
+      id: 'neetcode_150',
+      title: "NeetCode 150 Roadmap",
+      description: "Structured progressive list grouped by pattern and algorithmic difficulty.",
+      totalProblems: 150,
+      category: "Patterns"
+    },
+    problems: neetcode150Sheet
+  },
+  cp_essentials: {
+    sheet: {
+      id: 'cp_essentials',
+      title: "Codeforces Edu & CP Essentials",
+      description: "Speed, greedy heuristics, number theory, and contest-specific problem solving.",
+      totalProblems: 100,
+      category: "Competitive Programming"
+    },
+    problems: cpEssentialsSheet
+  }
+};
 
 router.get('/', async (req, res) => {
   const { cf_user = '', lc_user = '', ac_user = '', hr_user = '' } = req.query;
@@ -76,33 +132,27 @@ router.get('/leetcode/:username', async (req, res) => {
   res.json({ success: true, data: stats });
 });
 
+router.get('/sheets', (req, res) => {
+  const list = Object.values(SHEET_REGISTRY)
+    .filter((v, i, arr) => arr.findIndex(x => x.sheet.id === v.sheet.id) === i)
+    .map(v => v.sheet);
+  res.json({ success: true, sheets: list });
+});
+
 router.get('/sheets/striver', (req, res) => {
   res.json({
     success: true,
-    sheet: {
-      id: 'striver_sde',
-      title: "Striver's SDE Sheet (180)",
-      description: "Standard 180 curated problems asked in top-tier tech placement interviews.",
-      totalProblems: 180,
-      category: "Interview Preparation"
-    },
-    problems: striverSdeSheet
+    ...SHEET_REGISTRY.striver_sde
   });
 });
 
 router.get('/sheets/:sheetId', (req, res) => {
   const { sheetId } = req.params;
-  if (sheetId === 'striver_sde' || sheetId === 'striver') {
+  const match = SHEET_REGISTRY[sheetId];
+  if (match) {
     return res.json({
       success: true,
-      sheet: {
-        id: 'striver_sde',
-        title: "Striver's SDE Sheet (180)",
-        description: "Standard 180 curated problems asked in top-tier tech placement interviews.",
-        totalProblems: 180,
-        category: "Interview Preparation"
-      },
-      problems: striverSdeSheet
+      ...match
     });
   }
   res.status(404).json({ success: false, message: 'Sheet not found' });
