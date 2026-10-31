@@ -71,7 +71,7 @@ app.use((err, req, res, next) => {
   });
 });
 
-if (!process.env.VERCEL) {
+if (!process.env.VERCEL && !process.env.VERCEL_ENV && !process.env.AWS_LAMBDA_FUNCTION_NAME) {
   app.listen(PORT, () => {
     console.log(`===================================================`);
     console.log(`🚀 Placement Prep Backend running on http://localhost:${PORT}`);
