@@ -242,15 +242,55 @@ function getEmailWrapper(title, innerContent) {
   `;
 }
 
+import nodemailer from 'nodemailer';
+
+// Optional SMTP Transport (e.g. Gmail App Password: smtp.gmail.com)
+let smtpTransporter = null;
+if (process.env.SMTP_USER && (process.env.SMTP_PASS || process.env.GMAIL_APP_PASSWORD)) {
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS || process.env.GMAIL_APP_PASSWORD;
+  smtpTransporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: { user, pass }
+  });
+  console.log(`[Email Service] Configured live Gmail SMTP transporter for: ${user}`);
+}
+
 /**
- * Core email dispatcher using Resend API or Simulation
+ * Core email dispatcher using Gmail SMTP or Resend API
  */
 export async function sendEmail({ to, subject, html, text }) {
+  console.log(`[Email Service] Preparing dispatch to: ${to} | Subject: "${subject}"`);
+
+  // 1. Try Gmail SMTP if configured (Allows sending to ANY recipient worldwide without domain verification)
+  if (smtpTransporter) {
+    try {
+      const fromAddress = `PrepStack <${process.env.SMTP_USER}>`;
+      const info = await smtpTransporter.sendMail({
+        from: fromAddress,
+        to,
+        subject,
+        html,
+        text: text || subject
+      });
+      console.log(`[Email Service] ✅ Live email successfully delivered via Gmail SMTP to ${to} (Message ID: ${info.messageId})`);
+      return {
+        success: true,
+        delivered: true,
+        mode: 'smtp',
+        recipient: to,
+        subject,
+        messageId: info.messageId
+      };
+    } catch (smtpErr) {
+      console.warn(`[Email Service] ⚠️ Gmail SMTP delivery error:`, smtpErr.message);
+    }
+  }
+
+  // 2. Dispatch via Resend API
   const apiKey = RESEND_API_KEY;
   let liveDelivered = false;
   let resendDetails = null;
-
-  console.log(`[Email Service] Preparing dispatch to: ${to} | Subject: "${subject}"`);
 
   if (apiKey) {
     try {
@@ -276,8 +316,14 @@ export async function sendEmail({ to, subject, html, text }) {
         resendDetails = data;
         console.log(`[Email Service] ✅ Live email successfully delivered via Resend to ${to} (ID: ${data.id})`);
       } else {
-        console.warn(`[Email Service] ⚠️ Resend response:`, data);
         resendDetails = data;
+        if (data?.statusCode === 403 || data?.name === 'validation_error') {
+          console.warn(`[Email Service] ⚠️ Resend Sandbox Policy Blocked Delivery:`);
+          console.warn(`  Resend's free test domain (onboarding@resend.dev) ONLY allows sending to your account email (abhideepjain39@gmail.com).`);
+          console.warn(`  It rejected delivery to external recipient '${to}'. To deliver to all users, add a domain at resend.com/domains or configure Gmail SMTP.`);
+        } else {
+          console.warn(`[Email Service] ⚠️ Resend response:`, data);
+        }
       }
     } catch (err) {
       console.error(`[Email Service] ❌ Resend request network error:`, err.message);

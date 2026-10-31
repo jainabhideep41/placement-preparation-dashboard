@@ -368,6 +368,15 @@ router.post('/complete-onboarding', (req, res) => {
   }
 
   const user = completeUserOnboarding(email, handles, targetRole);
+  if (user && !user.welcomeEmailSent) {
+    sendWelcomeEmail({
+      email: user.email,
+      name: user.name,
+      provider: user.provider || 'google'
+    }).catch((err) => console.warn('[Onboarding Welcome Email Warning]:', err.message));
+    markWelcomeEmailSent(user.email);
+  }
+
   res.json({ success: true, user });
 });
 
