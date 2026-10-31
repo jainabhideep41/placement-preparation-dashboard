@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   ExternalLink, 
   CheckCircle2, 
@@ -13,23 +13,44 @@ import {
   Trophy,
   Code2,
   Sparkles,
-  Layers
+  Layers,
+  X,
+  Share2
 } from 'lucide-react';
 import { striverSdeSheet } from '../../data/striverSdeSheet';
 import { blind75Sheet } from '../../data/blind75Sheet';
 import { neetcode150Sheet } from '../../data/neetcode150Sheet';
 import { cpEssentialsSheet } from '../../data/cpEssentialsSheet';
+import { 
+  CANONICAL_STORAGE_KEY,
+  ALL_UNIQUE_PROBLEMS,
+  getCanonicalKey,
+  isProblemSolved,
+  toggleCanonicalSolvedState,
+  CANONICAL_TO_SHEETS_MAP,
+  matchProblem,
+  migrateLegacySolvedMaps
+} from '../../utils/curatedSheetsManager';
 import { useLocalCache } from '../../hooks/useLocalCache';
 import { ProgressBar } from '../common/ProgressBar';
 
 export const SHEET_REGISTRY = {
+  all_unique: {
+    id: 'all_unique',
+    title: "All Curated Problems (Master Question Bank)",
+    subtitle: "Consolidated 365 unique problems deduplicated across Striver, Blind 75, NeetCode 150, and CP Essentials.",
+    badge: "365 Unique Questions",
+    category: "Master Question Bank",
+    problems: ALL_UNIQUE_PROBLEMS,
+    groupType: 'topic',
+    groupLabel: 'Topic'
+  },
   striver_sde: {
     id: 'striver_sde',
     title: "Striver's SDE Sheet",
     subtitle: "The gold-standard curated 180 questions for top-tier product interview preparation.",
     badge: "180 Questions",
     category: "Interview Preparation",
-    storageKey: 'prep_striver_solved_map',
     problems: striverSdeSheet,
     groupType: 'day',
     groupLabel: 'Day'
@@ -40,7 +61,6 @@ export const SHEET_REGISTRY = {
     subtitle: "The definitive 75 LeetCode problems covering all fundamental algorithmic patterns.",
     badge: "75 Questions",
     category: "Patterns",
-    storageKey: 'prep_blind75_solved_map',
     problems: blind75Sheet,
     groupType: 'topic',
     groupLabel: 'Pattern'
@@ -51,7 +71,6 @@ export const SHEET_REGISTRY = {
     subtitle: "Structured progressive list grouped by pattern and algorithmic difficulty.",
     badge: "150 Questions",
     category: "Patterns",
-    storageKey: 'prep_neetcode150_solved_map',
     problems: neetcode150Sheet,
     groupType: 'topic',
     groupLabel: 'Category'
@@ -62,7 +81,6 @@ export const SHEET_REGISTRY = {
     subtitle: "Speed, greedy heuristics, number theory, and contest-specific problem solving rated 800-1600.",
     badge: "100 Questions",
     category: "Competitive Programming",
-    storageKey: 'prep_cp_essentials_solved_map',
     problems: cpEssentialsSheet,
     groupType: 'phase',
     groupLabel: 'Phase'
@@ -73,9 +91,17 @@ export function CuratedSheetViewer({ sheetId = 'striver_sde', onBack, onAddProbl
   const currentSheet = SHEET_REGISTRY[sheetId] || SHEET_REGISTRY.striver_sde;
   const rawProblems = currentSheet.problems;
 
-  // Solved problems map: { [problemId]: boolean }
-  const [solvedMap, setSolvedMap] = useLocalCache(currentSheet.storageKey, {});
+  // Global Canonical Solved Map across all sheets
+  const [canonicalSolvedMap, setCanonicalSolvedMap] = useLocalCache(CANONICAL_STORAGE_KEY, {});
   const [revisionAddedMap, setRevisionAddedMap] = useState({});
+
+  // Migrate any previous local storage caches on initial mount
+  useEffect(() => {
+    const migrated = migrateLegacySolvedMaps();
+    if (migrated && Object.keys(migrated).length > 0) {
+      setCanonicalSolvedMap(prev => ({ ...prev, ...migrated }));
+    }
+  }, [setCanonicalSolvedMap]);
 
   // Filter states
   const [searchQuery, setSearchQuery] = useState('');
@@ -84,7 +110,9 @@ export function CuratedSheetViewer({ sheetId = 'striver_sde', onBack, onAddProbl
   const [selectedDifficulty, setSelectedDifficulty] = useState('All');
   const [selectedPlatform, setSelectedPlatform] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All'); // 'All' | 'Solved' | 'Unsolved'
-  const [expandedGroups, setExpandedGroups] = useState({ 0: true, 1: true });
+  
+  // Track expanded groups explicitly: { [groupId]: boolean }
+  const [expandedGroups, setExpandedGroups] = useState({});
 
   // Helper to determine group identifier for any problem
   const getProblemGroup = useMemo(() => {
@@ -117,18 +145,10 @@ export function CuratedSheetViewer({ sheetId = 'striver_sde', onBack, onAddProbl
     };
   }, [currentSheet.groupType]);
 
-  // Toggle solved status
-  const toggleSolved = (problemId, e) => {
+  // Toggle solved status synchronized across all sheets
+  const toggleSolved = (problem, e) => {
     e?.stopPropagation();
-    setSolvedMap(prev => {
-      const updated = { ...prev };
-      if (updated[problemId]) {
-        delete updated[problemId];
-      } else {
-        updated[problemId] = true;
-      }
-      return updated;
-    });
+    setCanonicalSolvedMap(prev => toggleCanonicalSolvedState(problem, prev));
   };
 
   // Add to spaced repetition revision queue
@@ -150,18 +170,18 @@ export function CuratedSheetViewer({ sheetId = 'striver_sde', onBack, onAddProbl
         notes: notesContext,
         revisionInterval: '7d'
       });
-      setRevisionAddedMap(prev => ({ ...prev, [problem.id]: true }));
+      setRevisionAddedMap(prev => ({ ...prev, [problem.id || getCanonicalKey(problem)]: true }));
     }
   };
 
   // Compute overall metrics
   const totalCount = rawProblems.length;
-  const solvedCount = Object.keys(solvedMap).filter(id => solvedMap[id]).length;
-  const progressPct = Math.round((solvedCount / totalCount) * 100) || 0;
+  const solvedCount = rawProblems.filter(p => isProblemSolved(p, canonicalSolvedMap)).length;
+  const progressPct = totalCount > 0 ? Math.round((solvedCount / totalCount) * 100) : 0;
 
-  const easySolved = rawProblems.filter(p => p.difficulty === 'Easy' && solvedMap[p.id]).length;
-  const mediumSolved = rawProblems.filter(p => p.difficulty === 'Medium' && solvedMap[p.id]).length;
-  const hardSolved = rawProblems.filter(p => p.difficulty === 'Hard' && solvedMap[p.id]).length;
+  const easySolved = rawProblems.filter(p => p.difficulty === 'Easy' && isProblemSolved(p, canonicalSolvedMap)).length;
+  const mediumSolved = rawProblems.filter(p => p.difficulty === 'Medium' && isProblemSolved(p, canonicalSolvedMap)).length;
+  const hardSolved = rawProblems.filter(p => p.difficulty === 'Hard' && isProblemSolved(p, canonicalSolvedMap)).length;
 
   const easyTotal = rawProblems.filter(p => p.difficulty === 'Easy').length;
   const mediumTotal = rawProblems.filter(p => p.difficulty === 'Medium').length;
@@ -196,7 +216,7 @@ export function CuratedSheetViewer({ sheetId = 'striver_sde', onBack, onAddProbl
     });
   }, [rawProblems, getProblemGroup]);
 
-  // Filtered problems
+  // Filtered problems with robust search matching
   const filteredProblems = useMemo(() => {
     return rawProblems.filter(p => {
       const g = getProblemGroup(p);
@@ -205,22 +225,17 @@ export function CuratedSheetViewer({ sheetId = 'striver_sde', onBack, onAddProbl
       if (selectedDifficulty !== 'All' && p.difficulty !== selectedDifficulty) return false;
       if (selectedPlatform !== 'All' && p.platform !== selectedPlatform) return false;
       
-      const isSolved = Boolean(solvedMap[p.id]);
-      if (statusFilter === 'Solved' && !isSolved) return false;
-      if (statusFilter === 'Unsolved' && isSolved) return false;
+      const solved = isProblemSolved(p, canonicalSolvedMap);
+      if (statusFilter === 'Solved' && !solved) return false;
+      if (statusFilter === 'Unsolved' && solved) return false;
 
-      if (searchQuery.trim()) {
-        const query = searchQuery.toLowerCase();
-        const matchTitle = p.title.toLowerCase().includes(query);
-        const matchTopic = p.topic.toLowerCase().includes(query);
-        const matchPlatform = p.platform.toLowerCase().includes(query);
-        const matchRating = p.rating ? String(p.rating).includes(query) : false;
-        if (!matchTitle && !matchTopic && !matchPlatform && !matchRating) return false;
+      if (searchQuery.trim() && !matchProblem(p, searchQuery)) {
+        return false;
       }
 
       return true;
     });
-  }, [rawProblems, getProblemGroup, selectedGroup, selectedTopic, selectedDifficulty, selectedPlatform, statusFilter, searchQuery, solvedMap]);
+  }, [rawProblems, getProblemGroup, selectedGroup, selectedTopic, selectedDifficulty, selectedPlatform, statusFilter, searchQuery, canonicalSolvedMap]);
 
   // Group filtered problems into accordion sections
   const groupedSections = useMemo(() => {
@@ -246,7 +261,10 @@ export function CuratedSheetViewer({ sheetId = 'striver_sde', onBack, onAddProbl
   }, [filteredProblems, getProblemGroup]);
 
   const toggleGroupExpansion = (groupId) => {
-    setExpandedGroups(prev => ({ ...prev, [groupId]: !prev[groupId] }));
+    setExpandedGroups(prev => {
+      const current = prev[groupId] !== undefined ? prev[groupId] : true;
+      return { ...prev, [groupId]: !current };
+    });
   };
 
   const expandAll = () => {
@@ -256,7 +274,9 @@ export function CuratedSheetViewer({ sheetId = 'striver_sde', onBack, onAddProbl
   };
 
   const collapseAll = () => {
-    setExpandedGroups({});
+    const all = {};
+    groupsList.forEach((g) => { all[g.id] = false; });
+    setExpandedGroups(all);
   };
 
   const getDifficultyBadge = (difficulty) => {
@@ -307,6 +327,8 @@ export function CuratedSheetViewer({ sheetId = 'striver_sde', onBack, onAddProbl
     }
   };
 
+  const isSearching = Boolean(searchQuery.trim());
+
   return (
     <div className="space-y-6 animate-fadeIn font-sans pb-12">
       {/* Top Navigation & Breadcrumb */}
@@ -321,12 +343,15 @@ export function CuratedSheetViewer({ sheetId = 'striver_sde', onBack, onAddProbl
             <span>All Sheets</span>
           </button>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-xl sm:text-2xl font-extrabold text-gray-900 tracking-tight font-display">
                 {currentSheet.title}
               </h1>
               <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded-full bg-black text-white font-bold">
                 {currentSheet.badge}
+              </span>
+              <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 font-bold flex items-center gap-1">
+                <Share2 className="w-3 h-3" /> Cross-Sheet Synced
               </span>
             </div>
             <p className="text-xs text-gray-500 mt-0.5">
@@ -357,7 +382,7 @@ export function CuratedSheetViewer({ sheetId = 'striver_sde', onBack, onAddProbl
         <div className="p-4 rounded-2xl bg-white border border-gray-200 shadow-xs col-span-2 sm:col-span-2">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider font-mono">
-              Total Progress
+              Sheet Progress
             </span>
             <span className="text-xs font-mono font-bold text-gray-900">
               {solvedCount} / {totalCount} ({progressPct}%)
@@ -369,7 +394,7 @@ export function CuratedSheetViewer({ sheetId = 'striver_sde', onBack, onAddProbl
             color={progressPct >= 75 ? 'emerald' : progressPct >= 40 ? 'blue' : 'amber'}
           />
           <span className="text-[10px] text-gray-400 font-mono mt-1.5 block">
-            {totalCount - solvedCount} problems remaining to complete sheet
+            {totalCount - solvedCount} problems remaining • Common questions auto-sync with other sheets
           </span>
         </div>
 
@@ -422,33 +447,49 @@ export function CuratedSheetViewer({ sheetId = 'striver_sde', onBack, onAddProbl
       {/* Filter & Search Toolbar */}
       <div className="p-4 rounded-2xl bg-white border border-gray-200 shadow-xs space-y-3">
         <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-          {/* Search box */}
+          {/* Active Search Box */}
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-gray-400" />
+            <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by problem name, topic, platform, or rating..."
-              className="w-full pl-9 pr-3 py-2 rounded-xl bg-gray-50 border border-gray-200 text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:border-black font-medium"
+              placeholder="Search by problem name, topic, rating, or keywords (e.g. Two Sum, Subarray, DP, 4A)..."
+              className="w-full pl-9 pr-9 py-2 rounded-xl bg-gray-50 border border-gray-200 text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:border-black font-medium transition-colors"
             />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2.5 top-2.5 p-0.5 text-gray-400 hover:text-black rounded-full"
+                title="Clear search"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
 
-          {/* Quick status filter pills */}
-          <div className="flex items-center gap-1.5 text-xs font-mono">
-            {['All', 'Unsolved', 'Solved'].map((st) => (
-              <button
-                key={st}
-                onClick={() => setStatusFilter(st)}
-                className={`px-3 py-1.5 rounded-xl font-medium transition-all ${
-                  statusFilter === st
-                    ? 'bg-black text-white shadow-xs'
-                    : 'bg-gray-100 text-gray-600 hover:text-black hover:bg-gray-200'
-                }`}
-              >
-                {st}
-              </button>
-            ))}
+          {/* Quick Status Filter Pills & Result Counter */}
+          <div className="flex items-center gap-2">
+            {isSearching && (
+              <span className="text-[11px] font-mono px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 font-semibold whitespace-nowrap">
+                {filteredProblems.length} matched
+              </span>
+            )}
+            <div className="flex items-center gap-1.5 text-xs font-mono">
+              {['All', 'Unsolved', 'Solved'].map((st) => (
+                <button
+                  key={st}
+                  onClick={() => setStatusFilter(st)}
+                  className={`px-3 py-1.5 rounded-xl font-medium transition-all ${
+                    statusFilter === st
+                      ? 'bg-black text-white shadow-xs'
+                      : 'bg-gray-100 text-gray-600 hover:text-black hover:bg-gray-200'
+                  }`}
+                >
+                  {st}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -521,7 +562,7 @@ export function CuratedSheetViewer({ sheetId = 'striver_sde', onBack, onAddProbl
       {/* Problem List Display */}
       {filteredProblems.length === 0 ? (
         <div className="py-12 text-center bg-white border border-gray-200 rounded-3xl p-6">
-          <p className="text-sm font-semibold text-gray-700">No problems match your current filters</p>
+          <p className="text-sm font-semibold text-gray-700">No problems match your current search/filters</p>
           <p className="text-xs text-gray-400 mt-1">Try resetting search keywords or dropdown selections.</p>
           <button
             onClick={() => {
@@ -540,8 +581,9 @@ export function CuratedSheetViewer({ sheetId = 'striver_sde', onBack, onAddProbl
       ) : (
         <div className="space-y-4">
           {groupedSections.map((group) => {
-            const isExpanded = expandedGroups[group.id] ?? true;
-            const groupSolvedCount = group.problems.filter(p => solvedMap[p.id]).length;
+            // Guarantee that when a user searches, all matching groups are expanded!
+            const isExpanded = isSearching || (expandedGroups[group.id] !== undefined ? expandedGroups[group.id] : true);
+            const groupSolvedCount = group.problems.filter(p => isProblemSolved(p, canonicalSolvedMap)).length;
             const isGroupCompleted = groupSolvedCount === group.problems.length && group.problems.length > 0;
 
             return (
@@ -580,13 +622,18 @@ export function CuratedSheetViewer({ sheetId = 'striver_sde', onBack, onAddProbl
                 {isExpanded && (
                   <div className="divide-y divide-gray-100">
                     {group.problems.map((problem) => {
-                      const isSolved = Boolean(solvedMap[problem.id]);
-                      const isRevAdded = Boolean(revisionAddedMap[problem.id]);
+                      const isSolved = isProblemSolved(problem, canonicalSolvedMap);
+                      const isRevAdded = Boolean(revisionAddedMap[problem.id || getCanonicalKey(problem)]);
                       const platInfo = getPlatformBadge(problem.platform);
+                      
+                      // Check other sheets that also have this problem
+                      const canonKey = getCanonicalKey(problem);
+                      const sharedRefs = CANONICAL_TO_SHEETS_MAP[canonKey] || [];
+                      const otherSheets = sharedRefs.filter(ref => ref.sheetId !== currentSheet.id);
 
                       return (
                         <div
-                          key={problem.id}
+                          key={problem.id || canonKey}
                           className={`p-4 sm:px-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-colors ${
                             isSolved ? 'bg-emerald-50/20' : 'hover:bg-gray-50/50'
                           }`}
@@ -595,9 +642,9 @@ export function CuratedSheetViewer({ sheetId = 'striver_sde', onBack, onAddProbl
                           <div className="flex items-start gap-3 min-w-0 flex-1">
                             {/* Solved Checkbox */}
                             <button
-                              onClick={(e) => toggleSolved(problem.id, e)}
+                              onClick={(e) => toggleSolved(problem, e)}
                               className="mt-0.5 text-gray-300 hover:text-emerald-600 transition-colors shrink-0"
-                              title={isSolved ? 'Mark as Unsolved' : 'Mark as Solved'}
+                              title={isSolved ? 'Mark as Unsolved across all sheets' : 'Mark as Solved across all sheets'}
                             >
                               {isSolved ? (
                                 <CheckCircle2 className="w-5 h-5 text-emerald-600 fill-emerald-100" />
@@ -621,7 +668,7 @@ export function CuratedSheetViewer({ sheetId = 'striver_sde', onBack, onAddProbl
                                 </a>
 
                                 <span className="text-[10px] font-mono text-gray-400 font-medium">
-                                  #{problem.id.replace(/^[a-z0-9]+_/, '')}
+                                  #{problem.id ? problem.id.replace(/^[a-z0-9]+_/, '') : canonKey}
                                 </span>
                               </div>
 
@@ -648,6 +695,16 @@ export function CuratedSheetViewer({ sheetId = 'striver_sde', onBack, onAddProbl
                                 <span className="px-2 py-0.5 rounded-md bg-gray-100 text-gray-600 border border-gray-200">
                                   {problem.topic}
                                 </span>
+
+                                {/* Shared Sheets Indicator */}
+                                {otherSheets.length > 0 && (
+                                  <span 
+                                    className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200 font-semibold"
+                                    title={`This question also appears in: ${otherSheets.map(s => s.sheetName).join(', ')}`}
+                                  >
+                                    Also in {otherSheets.map(s => s.sheetName).join(' & ')}
+                                  </span>
+                                )}
                               </div>
                             </div>
                           </div>

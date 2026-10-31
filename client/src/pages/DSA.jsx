@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Code2, 
   Search, 
@@ -7,12 +7,15 @@ import {
   ExternalLink, 
   RotateCw, 
   CheckCircle, 
+  CheckCircle2,
+  Circle,
   Clock, 
   Layers, 
-  Sparkles,
-  Trophy,
-  Activity,
-  X
+  Sparkles, 
+  Trophy, 
+  Activity, 
+  X,
+  Share2
 } from 'lucide-react';
 import { MetricCard } from '../components/common/MetricCard';
 import { ProgressBar } from '../components/common/ProgressBar';
@@ -21,6 +24,20 @@ import { LoadingSkeleton, EmptyState } from '../components/common/LoadingSkeleto
 import { REVISION_INTERVALS } from '../utils/constants';
 import { CuratedSheetViewer } from '../components/dsa/CuratedSheetViewer';
 import { useLocalCache } from '../hooks/useLocalCache';
+import { 
+  CANONICAL_STORAGE_KEY,
+  ALL_UNIQUE_PROBLEMS,
+  getUniqueSolvedStats,
+  getSheetSolvedCount,
+  isProblemSolved,
+  toggleCanonicalSolvedState,
+  matchProblem,
+  migrateLegacySolvedMaps
+} from '../utils/curatedSheetsManager';
+import { striverSdeSheet } from '../data/striverSdeSheet';
+import { blind75Sheet } from '../data/blind75Sheet';
+import { neetcode150Sheet } from '../data/neetcode150Sheet';
+import { cpEssentialsSheet } from '../data/cpEssentialsSheet';
 
 export function DSA({ dsaHook }) {
   const {
@@ -41,27 +58,36 @@ export function DSA({ dsaHook }) {
 
   const [activeTab, setActiveTab] = useState('problems'); // 'problems' | 'platforms' | 'sheets' | 'topics'
   const [showAddModal, setShowAddModal] = useState(false);
-  const [selectedSheetId, setSelectedSheetId] = useState(null); // 'striver_sde' | 'blind_75' | 'neetcode_150' | 'cp_essentials' | null
+  const [selectedSheetId, setSelectedSheetId] = useState(null); // 'all_unique' | 'striver_sde' | 'blind_75' | 'neetcode_150' | 'cp_essentials' | null
+  const [curatedSearchQuery, setCuratedSearchQuery] = useState('');
 
-  // Persistent Solved Maps for all 4 curated sheets
-  const [striverSolvedMap] = useLocalCache('prep_striver_solved_map', {});
-  const [blind75SolvedMap] = useLocalCache('prep_blind75_solved_map', {});
-  const [neetcode150SolvedMap] = useLocalCache('prep_neetcode150_solved_map', {});
-  const [cpSolvedMap] = useLocalCache('prep_cp_essentials_solved_map', {});
+  // Synchronized Canonical Solved Map across all sheets
+  const [canonicalSolvedMap, setCanonicalSolvedMap] = useLocalCache(CANONICAL_STORAGE_KEY, {});
 
-  const getSheetSolvedCount = (id) => {
-    switch (id) {
-      case 'striver_sde':
-        return Object.keys(striverSolvedMap).filter(k => striverSolvedMap[k]).length;
-      case 'blind_75':
-        return Object.keys(blind75SolvedMap).filter(k => blind75SolvedMap[k]).length;
-      case 'neetcode_150':
-        return Object.keys(neetcode150SolvedMap).filter(k => neetcode150SolvedMap[k]).length;
-      case 'cp_essentials':
-        return Object.keys(cpSolvedMap).filter(k => cpSolvedMap[k]).length;
-      default:
-        return 0;
+  // Migrate legacy solved maps if any exist
+  useEffect(() => {
+    const migrated = migrateLegacySolvedMaps();
+    if (migrated && Object.keys(migrated).length > 0) {
+      setCanonicalSolvedMap(prev => ({ ...prev, ...migrated }));
     }
+  }, [setCanonicalSolvedMap]);
+
+  // Overall unique solved stats across all sheets (365 unique problems)
+  const uniqueStats = useMemo(() => {
+    return getUniqueSolvedStats(canonicalSolvedMap);
+  }, [canonicalSolvedMap]);
+
+  const sheetProblemsMap = useMemo(() => ({
+    all_unique: ALL_UNIQUE_PROBLEMS,
+    striver_sde: striverSdeSheet,
+    blind_75: blind75Sheet,
+    neetcode_150: neetcode150Sheet,
+    cp_essentials: cpEssentialsSheet
+  }), []);
+
+  const getSheetSolvedCountById = (sheetId) => {
+    const list = sheetProblemsMap[sheetId] || [];
+    return getSheetSolvedCount(list, canonicalSolvedMap);
   };
 
   // New problem form state
@@ -607,71 +633,270 @@ export function DSA({ dsaHook }) {
           />
         ) : (
           <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-4 rounded-2xl bg-white border border-gray-200 shadow-xs">
+            {/* Unique Questions Header & Sync Banner */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-5 rounded-2xl bg-white border border-gray-200 shadow-xs">
               <div>
-                <h2 className="text-sm font-bold text-gray-900 font-display">
-                  Placement Interview Sheets & Curated Roadmaps
-                </h2>
-                <p className="text-xs text-gray-500 mt-0.5">
-                  Select a curated challenge sheet to practice topic-wise questions with direct redirects to solve on LeetCode, Codeforces, GFG, and Coding Ninjas.
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="text-base font-bold text-gray-900 font-display">
+                    Curated Placement Sheets & Master Roadmaps
+                  </h2>
+                  <span className="text-[10px] font-mono uppercase px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 font-bold flex items-center gap-1">
+                    <Share2 className="w-3 h-3" /> Cross-Sheet Solved Sync Active
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Solving a question on one sheet automatically marks it solved on all sheets containing it.
                 </p>
               </div>
-              <span className="text-[11px] font-mono text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full font-semibold self-start sm:self-auto">
-                ● 4 Live Interactive Sheets
-              </span>
+              <div className="flex items-center gap-2 self-start sm:self-auto font-mono text-xs">
+                <span className="text-[11px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl">
+                  ● 365 Unique Problems Total
+                </span>
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {sheets.map((sheet) => {
-                const completed = getSheetSolvedCount(sheet.id);
-                const total = sheet.totalProblems;
-                const pct = Math.round((completed / total) * 100) || 0;
+            {/* Consolidated Unique Progress Card */}
+            <div className="p-5 rounded-2xl bg-white border border-gray-200 shadow-xs space-y-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-semibold text-gray-700 font-mono uppercase tracking-wider">
+                  Consolidated Preparation Progress (Unique Questions Only)
+                </span>
+                <span className="font-mono font-bold text-gray-900">
+                  {uniqueStats.solvedUnique} / {uniqueStats.totalUnique} Unique Solved ({uniqueStats.percent}%)
+                </span>
+              </div>
+              <ProgressBar
+                value={uniqueStats.solvedUnique}
+                max={uniqueStats.totalUnique}
+                color={uniqueStats.percent >= 75 ? 'emerald' : uniqueStats.percent >= 40 ? 'blue' : 'amber'}
+              />
+              <div className="flex items-center justify-between text-[11px] text-gray-500 font-mono pt-1">
+                <span>{uniqueStats.totalUnique - uniqueStats.solvedUnique} unique questions remaining</span>
+                <span className="text-blue-600 font-semibold">102 questions shared across multiple sheets</span>
+              </div>
+            </div>
 
-                return (
-                  <div 
-                    key={sheet.id} 
-                    onClick={() => setSelectedSheetId(sheet.id)}
-                    className="p-6 rounded-3xl bg-white border border-gray-200 shadow-xs space-y-4 transition-all hover:border-black hover:shadow-md cursor-pointer relative group"
+            {/* Global Instant Search across all 365 unique problems */}
+            <div className="p-4 rounded-2xl bg-white border border-gray-200 shadow-xs">
+              <div className="relative">
+                <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  value={curatedSearchQuery}
+                  onChange={(e) => setCuratedSearchQuery(e.target.value)}
+                  placeholder="Search across all 365 unique questions (e.g. Two Sum, Kadane, Subarray, DP, Watermelon, 4A)..."
+                  className="w-full pl-9 pr-9 py-2 rounded-xl bg-gray-50 border border-gray-200 text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:border-black font-medium transition-colors"
+                />
+                {curatedSearchQuery && (
+                  <button
+                    onClick={() => setCuratedSearchQuery('')}
+                    className="absolute right-2.5 top-2.5 p-0.5 text-gray-400 hover:text-black rounded-full"
+                    title="Clear search"
                   >
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="text-sm font-bold text-gray-900 font-display group-hover:text-blue-600 transition-colors">
-                            {sheet.title}
-                          </h3>
-                          <span className="text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded-full bg-emerald-600 text-white">
-                            Live Interactive
-                          </span>
-                        </div>
-                        <p className="text-xs text-gray-500 mt-1">{sheet.description}</p>
-                      </div>
-                      <Badge variant="blue">{sheet.category}</Badge>
-                    </div>
-
-                    <ProgressBar
-                      value={completed}
-                      max={total}
-                      subLabel={`${completed} / ${total} Solved`}
-                      color={pct >= 75 ? 'emerald' : pct >= 40 ? 'blue' : 'amber'}
-                    />
-
-                    <div className="flex items-center justify-between text-xs text-gray-500 pt-2 border-t border-gray-100 font-mono">
-                      <span>Remaining: <strong className="text-gray-900">{total - completed}</strong></span>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedSheetId(sheet.id);
-                        }}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-black text-white text-xs font-bold shadow-xs hover:bg-neutral-800 transition-all"
-                      >
-                        <span>Explore & Solve ({total})</span>
-                        <span className="text-xs">→</span>
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
             </div>
+
+            {/* Search Results Display OR Sheet Cards */}
+            {curatedSearchQuery.trim() ? (
+              <div className="bg-white border border-gray-200 rounded-2xl shadow-xs overflow-hidden">
+                <div className="px-5 py-3 bg-gray-50/80 border-b border-gray-200 flex items-center justify-between text-xs font-mono">
+                  <span className="font-bold text-gray-700">
+                    Search Results ({ALL_UNIQUE_PROBLEMS.filter(p => matchProblem(p, curatedSearchQuery)).length} matching questions)
+                  </span>
+                  <button 
+                    onClick={() => setCuratedSearchQuery('')}
+                    className="text-gray-500 hover:text-black underline text-[11px]"
+                  >
+                    Clear Search
+                  </button>
+                </div>
+
+                <div className="divide-y divide-gray-100 max-h-[600px] overflow-y-auto">
+                  {ALL_UNIQUE_PROBLEMS.filter(p => matchProblem(p, curatedSearchQuery)).map((problem) => {
+                    const isSolved = isProblemSolved(problem, canonicalSolvedMap);
+                    return (
+                      <div 
+                        key={problem.canonicalKey}
+                        className={`p-4 sm:px-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-colors ${
+                          isSolved ? 'bg-emerald-50/20' : 'hover:bg-gray-50/50'
+                        }`}
+                      >
+                        <div className="flex items-start gap-3 min-w-0 flex-1">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setCanonicalSolvedMap(prev => toggleCanonicalSolvedState(problem, prev));
+                            }}
+                            className="mt-0.5 text-gray-300 hover:text-emerald-600 transition-colors shrink-0"
+                            title={isSolved ? 'Mark as Unsolved' : 'Mark as Solved across all sheets'}
+                          >
+                            {isSolved ? (
+                              <CheckCircle2 className="w-5 h-5 text-emerald-600 fill-emerald-100" />
+                            ) : (
+                              <Circle className="w-5 h-5 text-gray-300 hover:text-gray-400" />
+                            )}
+                          </button>
+
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <a
+                                href={problem.problemUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className={`text-xs sm:text-sm font-bold hover:underline transition-colors ${
+                                  isSolved ? 'line-through text-gray-400' : 'text-gray-900 hover:text-blue-600'
+                                }`}
+                              >
+                                {problem.title}
+                              </a>
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[10px] font-mono">
+                              <span className="px-2 py-0.5 rounded-md font-semibold border bg-gray-100 text-gray-700 border-gray-200">
+                                {problem.difficulty}
+                              </span>
+                              {problem.rating && (
+                                <span className="px-2 py-0.5 rounded-md font-bold bg-amber-50 text-amber-900 border border-amber-300">
+                                  ★ {problem.rating}
+                                </span>
+                              )}
+                              <span className="px-2 py-0.5 rounded-md font-semibold border bg-orange-50 text-orange-800 border-orange-200">
+                                {problem.platform}
+                              </span>
+                              <span className="px-2 py-0.5 rounded-md bg-gray-100 text-gray-600 border border-gray-200">
+                                {problem.topic}
+                              </span>
+                              {problem.sheets?.length > 0 && (
+                                <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200 font-semibold">
+                                  In: {problem.sheets.map(s => s.sheetName).join(' • ')}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0 self-end sm:self-center font-mono text-xs">
+                          <a
+                            href={problem.problemUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-black hover:bg-neutral-800 text-white font-bold text-xs shadow-xs transition-all"
+                          >
+                            <span>Solve</span>
+                            <ExternalLink className="w-3 h-3 text-white/80" />
+                          </a>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Master Unique Question Bank Card */}
+                <div 
+                  onClick={() => setSelectedSheetId('all_unique')}
+                  className="p-6 rounded-3xl bg-gradient-to-br from-neutral-900 to-black text-white border-2 border-black shadow-[4px_4px_0px_rgba(0,0,0,0.3)] space-y-4 cursor-pointer hover:scale-[1.01] transition-all relative group md:col-span-2"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="text-base font-bold text-white font-display">
+                          All Curated Problems (Master Question Bank)
+                        </h3>
+                        <span className="text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded-full bg-emerald-500 text-black">
+                          365 Unique Questions
+                        </span>
+                        <span className="text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded-full bg-white/20 text-white">
+                          Zero Duplicates
+                        </span>
+                      </div>
+                      <p className="text-xs text-white/70 mt-1">
+                        Consolidated master challenge list containing all 365 unique problems from Striver, Blind 75, NeetCode 150, and CP Essentials without duplicate repetitions.
+                      </p>
+                    </div>
+                    <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-full bg-white/10 text-white border border-white/20 shrink-0">
+                      Master Bank
+                    </span>
+                  </div>
+
+                  <ProgressBar
+                    value={uniqueStats.solvedUnique}
+                    max={uniqueStats.totalUnique}
+                    subLabel={`${uniqueStats.solvedUnique} / ${uniqueStats.totalUnique} Unique Solved`}
+                    color={uniqueStats.percent >= 75 ? 'emerald' : uniqueStats.percent >= 40 ? 'blue' : 'amber'}
+                  />
+
+                  <div className="flex items-center justify-between text-xs text-white/70 pt-2 border-t border-white/10 font-mono">
+                    <span>Remaining: <strong className="text-white">{uniqueStats.totalUnique - uniqueStats.solvedUnique}</strong> unique questions</span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedSheetId('all_unique');
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white text-black text-xs font-bold shadow-xs hover:bg-neutral-200 transition-all"
+                    >
+                      <span>Explore All Unique (365)</span>
+                      <span className="text-xs">→</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Individual 4 Curated Sheets Cards */}
+                {sheets.map((sheet) => {
+                  const completed = getSheetSolvedCountById(sheet.id);
+                  const total = sheet.totalProblems;
+                  const pct = Math.round((completed / total) * 100) || 0;
+
+                  return (
+                    <div 
+                      key={sheet.id} 
+                      onClick={() => setSelectedSheetId(sheet.id)}
+                      className="p-6 rounded-3xl bg-white border border-gray-200 shadow-xs space-y-4 transition-all hover:border-black hover:shadow-md cursor-pointer relative group"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-sm font-bold text-gray-900 font-display group-hover:text-blue-600 transition-colors">
+                              {sheet.title}
+                            </h3>
+                            <span className="text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded-full bg-emerald-600 text-white">
+                              Live Interactive
+                            </span>
+                          </div>
+                          <p className="text-xs text-gray-500 mt-1">{sheet.description}</p>
+                        </div>
+                        <Badge variant="blue">{sheet.category}</Badge>
+                      </div>
+
+                      <ProgressBar
+                        value={completed}
+                        max={total}
+                        subLabel={`${completed} / ${total} Solved`}
+                        color={pct >= 75 ? 'emerald' : pct >= 40 ? 'blue' : 'amber'}
+                      />
+
+                      <div className="flex items-center justify-between text-xs text-gray-500 pt-2 border-t border-gray-100 font-mono">
+                        <span>Remaining: <strong className="text-gray-900">{total - completed}</strong></span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedSheetId(sheet.id);
+                          }}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-black text-white text-xs font-bold shadow-xs hover:bg-neutral-800 transition-all"
+                        >
+                          <span>Explore & Solve ({total})</span>
+                          <span className="text-xs">→</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )
       )}

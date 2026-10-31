@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { 
   Search, 
   RotateCw, 
@@ -8,9 +8,12 @@ import {
   X, 
   CheckCircle2, 
   Sparkles,
-  LogOut
+  LogOut,
+  ExternalLink,
+  Code2
 } from 'lucide-react';
 import { Badge } from '../common/Badge';
+import { ALL_UNIQUE_PROBLEMS, matchProblem } from '../../utils/curatedSheetsManager';
 
 export function Navbar({ 
   onRefresh, 
@@ -23,6 +26,24 @@ export function Navbar({
   currentUser,
   onLogout
 }) {
+  const [navSearchQuery, setNavSearchQuery] = useState('');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const searchRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (searchRef.current && !searchRef.current.contains(e.target)) {
+        setIsSearchOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const searchResults = useMemo(() => {
+    if (!navSearchQuery.trim()) return [];
+    return ALL_UNIQUE_PROBLEMS.filter(p => matchProblem(p, navSearchQuery)).slice(0, 6);
+  }, [navSearchQuery]);
   return (
     <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b border-black/10 bg-white/95 px-4 lg:px-6 backdrop-blur-md">
       {/* Left branding & mobile toggle */}
@@ -55,14 +76,90 @@ export function Navbar({
       </div>
 
       {/* Middle search bar */}
-      <div className="hidden md:flex items-center flex-1 max-w-md mx-6">
+      <div className="hidden md:flex items-center flex-1 max-w-md mx-6" ref={searchRef}>
         <div className="relative w-full">
           <Search className="absolute left-3 top-2.5 w-4 h-4 text-black/40" />
           <input
             type="text"
-            placeholder="Search problems, topics, system design case studies..."
-            className="w-full pl-9 pr-4 py-1.5 text-xs rounded-xl bg-[#F4F4F0] border border-black/10 text-black placeholder-black/40 focus:outline-none focus:border-black transition-colors"
+            value={navSearchQuery}
+            onChange={(e) => {
+              setNavSearchQuery(e.target.value);
+              setIsSearchOpen(true);
+            }}
+            onFocus={() => setIsSearchOpen(true)}
+            placeholder="Search all 365 questions, topics, patterns..."
+            className="w-full pl-9 pr-8 py-1.5 text-xs rounded-xl bg-[#F4F4F0] border border-black/10 text-black placeholder-black/40 focus:outline-none focus:border-black transition-colors"
           />
+          {navSearchQuery && (
+            <button
+              onClick={() => {
+                setNavSearchQuery('');
+                setIsSearchOpen(false);
+              }}
+              className="absolute right-2.5 top-2.5 text-black/40 hover:text-black"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+
+          {/* Quick Dropdown Results Panel */}
+          {isSearchOpen && navSearchQuery.trim() && (
+            <div className="absolute left-0 right-0 top-full mt-2 bg-white rounded-2xl border-2 border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] overflow-hidden z-50 animate-fadeIn">
+              <div className="px-3.5 py-2 bg-[#F4F4F0] border-b border-black/10 flex items-center justify-between text-[11px] font-mono text-black/60">
+                <span>Matched Questions ({searchResults.length})</span>
+                <span>Press ESC or click outside to dismiss</span>
+              </div>
+
+              {searchResults.length === 0 ? (
+                <div className="p-4 text-center text-xs text-black/50 font-mono">
+                  No questions match &ldquo;{navSearchQuery}&rdquo;
+                </div>
+              ) : (
+                <div className="divide-y divide-black/5 max-h-80 overflow-y-auto">
+                  {searchResults.map((item) => (
+                    <div 
+                      key={item.canonicalKey}
+                      className="p-3 hover:bg-[#F4F4F0] transition-colors flex items-center justify-between gap-3 text-xs"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="font-bold text-black truncate hover:underline">
+                          <a href={item.problemUrl} target="_blank" rel="noopener noreferrer">
+                            {item.title}
+                          </a>
+                        </div>
+                        <div className="flex items-center gap-1.5 mt-1 text-[10px] font-mono text-black/60">
+                          <span className="font-semibold text-black">{item.platform}</span>
+                          <span>•</span>
+                          <span className={item.difficulty === 'Easy' ? 'text-emerald-700' : item.difficulty === 'Medium' ? 'text-amber-700' : 'text-rose-700'}>
+                            {item.difficulty}
+                          </span>
+                          {item.rating && (
+                            <>
+                              <span>•</span>
+                              <span className="text-amber-700 font-bold">★ {item.rating}</span>
+                            </>
+                          )}
+                          <span>•</span>
+                          <span className="truncate">{item.topic}</span>
+                        </div>
+                      </div>
+
+                      <a
+                        href={item.problemUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={() => setIsSearchOpen(false)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-black text-white text-[11px] font-bold shadow-xs hover:bg-neutral-800 shrink-0"
+                      >
+                        <span>Solve</span>
+                        <ExternalLink className="w-3 h-3 text-white/80" />
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

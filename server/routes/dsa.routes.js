@@ -12,7 +12,46 @@ import { getHackerRankStats } from '../services/dsa/hackerrank.adapter.js';
 
 const router = Router();
 
+function getCanonicalKey(p) {
+  if (!p) return '';
+  if (p.problemUrl) {
+    const lcMatch = p.problemUrl.match(/leetcode\.com\/problems\/([^/?#]+)/i);
+    if (lcMatch) return 'lc:' + lcMatch[1].toLowerCase().replace(/\/$/, '');
+
+    const cfMatch = p.problemUrl.match(/codeforces\.com\/problemset\/problem\/([0-9]+)\/([A-Za-z0-9]+)/i);
+    if (cfMatch) return 'cf:' + cfMatch[1] + '-' + cfMatch[2].toLowerCase();
+
+    const cnMatch = p.problemUrl.match(/codingninjas\.com\/.*\/([a-z0-9-]+)(?:_|\?|$)/i);
+    if (cnMatch) return 'cn:' + cnMatch[1].toLowerCase();
+
+    const gfgMatch = p.problemUrl.match(/geeksforgeeks\.org\/problems\/([^/?#]+)/i);
+    if (gfgMatch) return 'gfg:' + gfgMatch[1].toLowerCase();
+  }
+  return 'title:' + (p.title || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+const uniqueMap = new Map();
+for (const list of [striverSdeSheet, blind75Sheet, neetcode150Sheet, cpEssentialsSheet]) {
+  for (const p of list) {
+    const key = getCanonicalKey(p);
+    if (!uniqueMap.has(key)) {
+      uniqueMap.set(key, { ...p, canonicalKey: key });
+    }
+  }
+}
+const allUniqueSheet = Array.from(uniqueMap.values());
+
 const SHEET_REGISTRY = {
+  all_unique: {
+    sheet: {
+      id: 'all_unique',
+      title: "All Curated Problems (Master Question Bank)",
+      description: "Consolidated 365 unique problems deduplicated across Striver, Blind 75, NeetCode 150, and CP Essentials.",
+      totalProblems: allUniqueSheet.length,
+      category: "Master Question Bank"
+    },
+    problems: allUniqueSheet
+  },
   striver_sde: {
     sheet: {
       id: 'striver_sde',
