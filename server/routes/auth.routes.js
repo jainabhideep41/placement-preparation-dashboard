@@ -1,4 +1,5 @@
 import express from 'express';
+import { getUserByEmail, saveOrMergeUser, completeUserOnboarding } from '../data/userStore.js';
 
 const router = express.Router();
 
@@ -140,23 +141,29 @@ router.get('/github/callback', async (req, res) => {
       }
     }
 
-    // 4. Construct authenticated student profile
-    const studentUser = {
+    // 4. Save or unify user account by email
+    const email = primaryEmail || `${ghUser.login}@users.noreply.github.com`;
+    const existing = getUserByEmail(email);
+    const isNewUser = !existing || !existing.onboardingCompleted;
+
+    const studentUser = saveOrMergeUser({
       id: `gh_${ghUser.id}`,
       name: ghUser.name || ghUser.login,
-      email: primaryEmail || `${ghUser.login}@users.noreply.github.com`,
+      email,
       targetRole: 'Software Development Engineer (SDE-1)',
       provider: 'github',
       avatarUrl: ghUser.avatar_url,
       handles: {
-        leetcode: '',
-        codeforces: '',
-        github: ghUser.login // Automatically links their real GitHub handle!
+        github: ghUser.login
       },
-      loggedInAt: new Date().toISOString()
-    };
+      onboardingCompleted: !isNewUser
+    });
 
-    const userParam = encodeURIComponent(JSON.stringify(studentUser));
+    const userParam = encodeURIComponent(JSON.stringify({
+      ...studentUser,
+      isNewUser,
+      oauthProvider: 'github'
+    }));
     res.redirect(`${getClientUrl(req)}/?oauth_success=true&user=${userParam}`);
   } catch (err) {
     console.error('[GitHub OAuth Error]:', err.message);
@@ -226,23 +233,26 @@ router.get('/google/callback', async (req, res) => {
 
     const gUser = await userInfoResponse.json();
 
-    // 3. Construct authenticated student profile
-    const studentUser = {
+    // 3. Save or unify user account by email
+    const email = gUser.email;
+    const existing = getUserByEmail(email);
+    const isNewUser = !existing || !existing.onboardingCompleted;
+
+    const studentUser = saveOrMergeUser({
       id: `google_${gUser.sub}`,
       name: gUser.name || gUser.given_name || 'Google User',
-      email: gUser.email,
+      email,
       targetRole: 'Software Development Engineer (SDE-1)',
       provider: 'google',
       avatarUrl: gUser.picture,
-      handles: {
-        leetcode: '',
-        codeforces: '',
-        github: ''
-      },
-      loggedInAt: new Date().toISOString()
-    };
+      onboardingCompleted: !isNewUser
+    });
 
-    const userParam = encodeURIComponent(JSON.stringify(studentUser));
+    const userParam = encodeURIComponent(JSON.stringify({
+      ...studentUser,
+      isNewUser,
+      oauthProvider: 'google'
+    }));
     res.redirect(`${getClientUrl(req)}/?oauth_success=true&user=${userParam}`);
   } catch (err) {
     console.error('[Google OAuth Error]:', err.message);
@@ -310,6 +320,54 @@ router.post('/instant-oauth', async (req, res) => {
       message: err.message
     });
   }
+});
+
+/**
+ * POST /api/auth/complete-onboarding
+ * Completes first-time setup for OAuth users with their competitive programming handles
+ */
+router.post('/complete-onboarding', (req, res) => {
+  const { email, handles, targetRole } = req.body;
+  if (!email) {
+    return res.status(400).json({ success: false, message: 'Email is required' });
+  }
+
+  const user = completeUserOnboarding(email, handles, targetRole);
+  res.json({ success: true, user });
+});
+
+/**
+ * POST /api/auth/register-or-login
+ * Unified account registration or login for email/password users
+ */
+router.post('/register-or-login', (req, res) => {
+  const { email, name, handles, targetRole, provider = 'email' } = req.body;
+  if (!email) {
+    return res.status(400).json({ success: false, message: 'Email is required' });
+  }
+
+  const user = saveOrMergeUser({
+    email,
+    name,
+    handles,
+    targetRole,
+    provider,
+    onboardingCompleted: true
+  });
+
+  res.json({ success: true, user });
+});
+
+/**
+ * GET /api/auth/user/:email
+ * Fetches unified account by email
+ */
+router.get('/user/:email', (req, res) => {
+  const user = getUserByEmail(req.params.email);
+  if (!user) {
+    return res.status(404).json({ success: false, message: 'User not found' });
+  }
+  res.json({ success: true, user });
 });
 
 export default router;

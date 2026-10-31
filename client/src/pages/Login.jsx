@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { findUserByEmail, saveUserToRegistry } from '../utils/accountManager';
 import { 
   Terminal, 
   Code2, 
@@ -119,22 +120,41 @@ export function Login({ onLogin }) {
       return;
     }
 
-    const studentUser = {
-      id: `std_${Date.now()}`,
-      name: name.trim() || email.split('@')[0],
-      email: email.trim(),
-      targetRole,
-      provider: 'email',
-      avatarUrl: `https://ui-avatars.com/api/?name=${encodeURIComponent(name || email.split('@')[0])}&background=111&color=fff`,
-      handles: {
-        leetcode: leetcodeHandle.trim(),
-        codeforces: codeforcesHandle.trim(),
-        github: githubHandle.trim()
-      },
-      loggedInAt: new Date().toISOString()
-    };
+    const cleanEmail = email.trim().toLowerCase();
+    const existing = findUserByEmail(cleanEmail);
 
-    onLogin(studentUser);
+    const unifiedUser = saveUserToRegistry({
+      ...existing,
+      name: name.trim() || existing?.name || cleanEmail.split('@')[0],
+      email: cleanEmail,
+      targetRole: targetRole || existing?.targetRole || 'Software Development Engineer (SDE-1)',
+      provider: 'email',
+      avatarUrl: existing?.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(name || cleanEmail.split('@')[0])}&background=111&color=fff`,
+      handles: {
+        leetcode: leetcodeHandle.trim() || existing?.handles?.leetcode || '',
+        codeforces: codeforcesHandle.trim() || existing?.handles?.codeforces || '',
+        github: githubHandle.trim() || existing?.handles?.github || ''
+      },
+      onboardingCompleted: true
+    });
+
+    try {
+      fetch('/api/auth/register-or-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: unifiedUser.email,
+          name: unifiedUser.name,
+          handles: unifiedUser.handles,
+          targetRole: unifiedUser.targetRole,
+          provider: 'email'
+        })
+      }).catch(() => {});
+    } catch (e) {
+      // offline fallback
+    }
+
+    onLogin(unifiedUser);
   };
 
   const handleInstantGhSubmit = async (e) => {

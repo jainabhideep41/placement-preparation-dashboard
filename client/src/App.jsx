@@ -9,6 +9,8 @@ import { GitHubFOSS } from './pages/GitHubFOSS';
 import { PlacementReadiness } from './pages/PlacementReadiness';
 import { Settings } from './pages/Settings';
 import { Login } from './pages/Login';
+import { OnboardingModal } from './components/common/OnboardingModal';
+import { findUserByEmail, saveUserToRegistry } from './utils/accountManager';
 
 import { useDashboardData } from './hooks/useDashboardData';
 import { useDSAData } from './hooks/useDSAData';
@@ -25,6 +27,7 @@ export function App() {
 
   const [activePage, setActivePage] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [onboardingUser, setOnboardingUser] = useState(null);
 
   // Custom Hooks (Directly fulfills React Hooks requirement)
   const dashboardHook = useDashboardData();
@@ -38,14 +41,18 @@ export function App() {
   };
 
   const handleLogin = (user) => {
-    setCurrentUser(user);
-    if (user.handles) {
-      setHandles((prev) => ({
-        leetcode: user.handles.leetcode || prev?.leetcode || '',
-        codeforces: user.handles.codeforces || prev?.codeforces || '',
-        github: user.handles.github || prev?.github || ''
-      }));
+    // Unify user record in registry
+    const unified = saveUserToRegistry(user);
+    setCurrentUser(unified);
+
+    if (unified.handles) {
+      setHandles({
+        leetcode: unified.handles.leetcode || '',
+        codeforces: unified.handles.codeforces || '',
+        github: unified.handles.github || ''
+      });
     }
+
     // Clear stale caches so dashboard loads the student's fresh profile
     window.localStorage.removeItem('prep_dashboard_cache');
     window.localStorage.removeItem('prep_dsa_cache');
@@ -63,7 +70,29 @@ export function App() {
     if (oauthSuccess === 'true' && userParam) {
       try {
         const authenticatedUser = JSON.parse(decodeURIComponent(userParam));
-        handleLogin(authenticatedUser);
+        const email = authenticatedUser.email;
+        const existingRegistryUser = findUserByEmail(email);
+
+        // Check if user has already completed onboarding
+        const hasCompletedOnboarding = existingRegistryUser?.onboardingCompleted;
+
+        // If it's a first time OAuth user who has not completed onboarding
+        if (authenticatedUser.isNewUser && !hasCompletedOnboarding) {
+          setOnboardingUser(authenticatedUser);
+        } else {
+          // Unified account: merge with existing account and log in directly
+          const unifiedUser = saveUserToRegistry({
+            ...existingRegistryUser,
+            ...authenticatedUser,
+            handles: {
+              leetcode: existingRegistryUser?.handles?.leetcode || authenticatedUser.handles?.leetcode || '',
+              codeforces: existingRegistryUser?.handles?.codeforces || authenticatedUser.handles?.codeforces || '',
+              github: authenticatedUser.handles?.github || existingRegistryUser?.handles?.github || ''
+            },
+            onboardingCompleted: true
+          });
+          handleLogin(unifiedUser);
+        }
       } catch (e) {
         console.error('Failed to parse OAuth user:', e);
       } finally {
@@ -71,6 +100,42 @@ export function App() {
       }
     }
   }, []);
+
+  const handleCompleteOnboarding = async (handles, targetRole) => {
+    if (!onboardingUser) return;
+
+    const email = onboardingUser.email;
+    const existing = findUserByEmail(email);
+
+    const unifiedUser = saveUserToRegistry({
+      ...existing,
+      ...onboardingUser,
+      handles: {
+        leetcode: handles.leetcode || existing?.handles?.leetcode || '',
+        codeforces: handles.codeforces || existing?.handles?.codeforces || '',
+        github: handles.github || onboardingUser.handles?.github || existing?.handles?.github || ''
+      },
+      targetRole: targetRole || existing?.targetRole || onboardingUser.targetRole,
+      onboardingCompleted: true
+    });
+
+    try {
+      fetch('/api/auth/complete-onboarding', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: unifiedUser.email,
+          handles: unifiedUser.handles,
+          targetRole: unifiedUser.targetRole
+        })
+      }).catch(() => {});
+    } catch (e) {
+      // offline fallback
+    }
+
+    setOnboardingUser(null);
+    handleLogin(unifiedUser);
+  };
 
   const handleLogout = () => {
     setCurrentUser(null);
@@ -81,6 +146,11 @@ export function App() {
     window.localStorage.removeItem('prep_webdev_state');
     window.localStorage.removeItem('prep_sysdesign_state');
   };
+
+  // If first-time OAuth onboarding is active, show the OnboardingModal
+  if (onboardingUser) {
+    return <OnboardingModal user={onboardingUser} onComplete={handleCompleteOnboarding} />;
+  }
 
   // If student is not logged in, render the Login / Registration page!
   if (!currentUser) {
