@@ -32,7 +32,7 @@ export async function getLeetCodeStats(username = '') {
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
 
     const res = await fetch('https://leetcode.com/graphql', {
       method: 'POST',
@@ -63,6 +63,20 @@ export async function getLeetCodeStats(username = '') {
               totalParticipants
               topPercentage
               attendedContestsCount
+              badge {
+                name
+              }
+            }
+            userContestRankingHistory(username: $username) {
+              attended
+              rating
+              ranking
+              trendDirection
+              problemsSolved
+              contest {
+                title
+                startTime
+              }
             }
             recentAcSubmissionList(username: $username, limit: 15) {
               id
@@ -109,6 +123,17 @@ export async function getLeetCodeStats(username = '') {
       ? `#${matchedUser.profile.ranking.toLocaleString()}`
       : (contest?.topPercentage ? `Top ${contest.topPercentage}%` : 'Unranked');
 
+    const contestHistory = (data?.data?.userContestRankingHistory || [])
+      .filter(h => h.attended)
+      .map(h => ({
+        contestName: h.contest?.title || 'Weekly Contest',
+        rating: Math.round(h.rating),
+        ranking: h.ranking,
+        problemsSolved: h.problemsSolved,
+        trendDirection: h.trendDirection,
+        date: new Date(Number(h.contest?.startTime) * 1000).toISOString().split('T')[0]
+      }));
+
     const recentSubmissions = (data?.data?.recentAcSubmissionList || []).map(s => ({
       id: `lc_${s.id}`,
       title: s.title,
@@ -133,7 +158,11 @@ export async function getLeetCodeStats(username = '') {
       hard,
       ranking,
       contestRating,
-      contestsAttended: contest?.attendedContestsCount || 0,
+      contestBadge: contest?.badge?.name || (contestRating >= 2150 ? 'Guardian' : contestRating >= 1850 ? 'Knight' : null),
+      topPercentage: contest?.topPercentage || null,
+      globalRanking: contest?.globalRanking || null,
+      contestsAttended: contest?.attendedContestsCount || contestHistory.length || 0,
+      contestHistory,
       recentSubmissions,
       lastUpdated: new Date().toISOString(),
       status: 'synced',
