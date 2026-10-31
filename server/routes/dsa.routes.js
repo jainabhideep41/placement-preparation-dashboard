@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { defaultDSAData } from '../data/seedData.js';
+import { striverSdeSheet } from '../data/striverSdeSheet.js';
 import { getStoredProblems, addProblemToStore, updateProblemInStore } from '../data/problemStore.js';
 import { getCodeforcesStats } from '../services/dsa/codeforces.adapter.js';
 import { getLeetCodeStats } from '../services/dsa/leetcode.adapter.js';
@@ -73,6 +74,38 @@ router.get('/codeforces/:username', async (req, res) => {
 router.get('/leetcode/:username', async (req, res) => {
   const stats = await getLeetCodeStats(req.params.username);
   res.json({ success: true, data: stats });
+});
+
+router.get('/sheets/striver', (req, res) => {
+  res.json({
+    success: true,
+    sheet: {
+      id: 'striver_sde',
+      title: "Striver's SDE Sheet (180)",
+      description: "Standard 180 curated problems asked in top-tier tech placement interviews.",
+      totalProblems: 180,
+      category: "Interview Preparation"
+    },
+    problems: striverSdeSheet
+  });
+});
+
+router.get('/sheets/:sheetId', (req, res) => {
+  const { sheetId } = req.params;
+  if (sheetId === 'striver_sde' || sheetId === 'striver') {
+    return res.json({
+      success: true,
+      sheet: {
+        id: 'striver_sde',
+        title: "Striver's SDE Sheet (180)",
+        description: "Standard 180 curated problems asked in top-tier tech placement interviews.",
+        totalProblems: 180,
+        category: "Interview Preparation"
+      },
+      problems: striverSdeSheet
+    });
+  }
+  res.status(404).json({ success: false, message: 'Sheet not found' });
 });
 
 router.post('/problems', (req, res) => {
