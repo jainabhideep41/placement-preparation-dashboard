@@ -963,6 +963,55 @@ export function Login({ onLogin }) {
                 )}
               </button>
 
+              {/* Instant Access Bypass Button for university / institutional firewalls */}
+              <button
+                type="button"
+                onClick={async () => {
+                  setRegVerifyLoading(true);
+                  try {
+                    const cleanEmail = email.trim().toLowerCase();
+                    const res = await fetch('/api/auth/register-or-login', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        email: cleanEmail,
+                        name: name.trim() || cleanEmail.split('@')[0],
+                        password,
+                        handles: {
+                          leetcode: leetcodeHandle.trim(),
+                          codeforces: codeforcesHandle.trim(),
+                          github: githubHandle.trim()
+                        },
+                        targetRole
+                      })
+                    });
+                    const data = await res.json();
+                    const student = saveUserToRegistry({
+                      ...(data.user || {}),
+                      email: cleanEmail,
+                      name: name.trim() || cleanEmail.split('@')[0],
+                      onboardingCompleted: true
+                    });
+                    setShowRegVerifyModal(false);
+                    onLogin(student);
+                  } catch (e) {
+                    const student = saveUserToRegistry({
+                      email: email.trim().toLowerCase(),
+                      name: name.trim() || email.split('@')[0],
+                      onboardingCompleted: true
+                    });
+                    setShowRegVerifyModal(false);
+                    onLogin(student);
+                  } finally {
+                    setRegVerifyLoading(false);
+                  }
+                }}
+                className="w-full h-10 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-gray-200"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Instant Access (Bypass Verification)</span>
+              </button>
+
               <div className="flex items-center justify-between pt-1 text-[11px]">
                 <button
                   type="button"
