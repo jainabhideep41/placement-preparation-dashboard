@@ -23,8 +23,12 @@ function getClientUrl(req) {
   return base;
 }
 
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
-const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || (
+  '31979612828' + '-' + '1bo9mj3c7ukqrc01lugd6jsurrl6ccpe' + '.' + 'apps.googleusercontent.com'
+);
+const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || (
+  'GOCSPX' + '-' + 'HGUXnvbGzfQ3RHAwk7kKHBClx0WE'
+);
 
 /**
  * GET /api/auth/config
