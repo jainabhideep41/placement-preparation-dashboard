@@ -2,8 +2,26 @@ import express from 'express';
 
 const router = express.Router();
 
-const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
-const SERVER_URL = process.env.SERVER_URL || 'http://localhost:5000';
+function getBaseUrl(req) {
+  if (process.env.SERVER_URL) return process.env.SERVER_URL.replace(/\/$/, '');
+  if (process.env.VERCEL_PROJECT_PRODUCTION_URL) return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+  if (req) {
+    const proto = req.headers['x-forwarded-proto'] || req.protocol || 'http';
+    const host = req.headers['x-forwarded-host'] || req.get('host');
+    if (host) return `${proto}://${host}`;
+  }
+  return 'http://localhost:5000';
+}
+
+function getClientUrl(req) {
+  if (process.env.CLIENT_URL) return process.env.CLIENT_URL.replace(/\/$/, '');
+  const base = getBaseUrl(req);
+  if (base.includes('localhost') || base.includes('127.0.0.1')) {
+    return 'http://localhost:5173';
+  }
+  return base;
+}
 
 /**
  * GET /api/auth/config
@@ -33,10 +51,10 @@ router.get('/github', (req, res) => {
   const clientId = process.env.GITHUB_CLIENT_ID;
   if (!clientId || !process.env.GITHUB_CLIENT_SECRET) {
     // Redirect with prompt indicator so client opens interactive sign-in
-    return res.redirect(`${CLIENT_URL}/?oauth_info=github_unconfigured`);
+    return res.redirect(`${getClientUrl(req)}/?oauth_info=github_unconfigured`);
   }
 
-  const callbackUrl = `${SERVER_URL}/api/auth/github/callback`;
+  const callbackUrl = `${getBaseUrl(req)}/api/auth/github/callback`;
   const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(callbackUrl)}&scope=read:user,user:email`;
   res.redirect(githubAuthUrl);
 });
@@ -50,7 +68,7 @@ router.get('/github/callback', async (req, res) => {
 
   if (error || !code) {
     console.warn('[GitHub OAuth] Authorization error:', error);
-    return res.redirect(`${CLIENT_URL}/?oauth_error=${encodeURIComponent(error || 'Authorization denied')}`);
+    return res.redirect(`${getClientUrl(req)}/?oauth_error=${encodeURIComponent(error || 'Authorization denied')}`);
   }
 
   try {
@@ -126,10 +144,10 @@ router.get('/github/callback', async (req, res) => {
     };
 
     const userParam = encodeURIComponent(JSON.stringify(studentUser));
-    res.redirect(`${CLIENT_URL}/?oauth_success=true&user=${userParam}`);
+    res.redirect(`${getClientUrl(req)}/?oauth_success=true&user=${userParam}`);
   } catch (err) {
     console.error('[GitHub OAuth Error]:', err.message);
-    res.redirect(`${CLIENT_URL}/?oauth_error=${encodeURIComponent(err.message)}`);
+    res.redirect(`${getClientUrl(req)}/?oauth_error=${encodeURIComponent(err.message)}`);
   }
 });
 
@@ -140,10 +158,10 @@ router.get('/github/callback', async (req, res) => {
 router.get('/google', (req, res) => {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   if (!clientId || !process.env.GOOGLE_CLIENT_SECRET) {
-    return res.redirect(`${CLIENT_URL}/?oauth_info=google_unconfigured`);
+    return res.redirect(`${getClientUrl(req)}/?oauth_info=google_unconfigured`);
   }
 
-  const callbackUrl = `${SERVER_URL}/api/auth/google/callback`;
+  const callbackUrl = `${getBaseUrl(req)}/api/auth/google/callback`;
   const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(callbackUrl)}&response_type=code&scope=openid%20profile%20email&access_type=offline&prompt=select_account`;
   res.redirect(googleAuthUrl);
 });
@@ -157,11 +175,11 @@ router.get('/google/callback', async (req, res) => {
 
   if (error || !code) {
     console.warn('[Google OAuth] Authorization error:', error);
-    return res.redirect(`${CLIENT_URL}/?oauth_error=${encodeURIComponent(error || 'Authorization denied')}`);
+    return res.redirect(`${getClientUrl(req)}/?oauth_error=${encodeURIComponent(error || 'Authorization denied')}`);
   }
 
   try {
-    const callbackUrl = `${SERVER_URL}/api/auth/google/callback`;
+    const callbackUrl = `${getBaseUrl(req)}/api/auth/google/callback`;
 
     // 1. Exchange code for access token
     const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
@@ -213,10 +231,10 @@ router.get('/google/callback', async (req, res) => {
     };
 
     const userParam = encodeURIComponent(JSON.stringify(studentUser));
-    res.redirect(`${CLIENT_URL}/?oauth_success=true&user=${userParam}`);
+    res.redirect(`${getClientUrl(req)}/?oauth_success=true&user=${userParam}`);
   } catch (err) {
     console.error('[Google OAuth Error]:', err.message);
-    res.redirect(`${CLIENT_URL}/?oauth_error=${encodeURIComponent(err.message)}`);
+    res.redirect(`${getClientUrl(req)}/?oauth_error=${encodeURIComponent(err.message)}`);
   }
 });
 

@@ -718,8 +718,10 @@ export function Login({ onLogin }) {
                   <span className="font-bold text-black block">For GitHub OAuth App:</span>
                   <p className="text-black/70">
                     1. Go to <strong>GitHub &rarr; Settings &rarr; Developer settings &rarr; OAuth Apps</strong><br />
-                    2. Callback URL: <code className="text-blue-700 bg-white px-1 rounded">http://localhost:5000/api/auth/github/callback</code><br />
-                    3. Set <code className="text-black font-bold">GITHUB_CLIENT_ID</code> and <code className="text-black font-bold">GITHUB_CLIENT_SECRET</code> in <code className="text-black font-bold">server/.env</code>.
+                    2. Authorization callback URL:<br />
+                    • Production: <code className="text-blue-700 bg-white px-1 rounded break-all">https://placement-preparation-dashboard-five.vercel.app/api/auth/github/callback</code><br />
+                    • Localhost: <code className="text-blue-700 bg-white px-1 rounded">http://localhost:5000/api/auth/github/callback</code><br />
+                    3. Set <code className="text-black font-bold">GITHUB_CLIENT_ID</code> and <code className="text-black font-bold">GITHUB_CLIENT_SECRET</code> in Vercel Environment Variables.
                   </p>
 
                   <div className="h-px bg-black/10 my-1" />
@@ -727,8 +729,10 @@ export function Login({ onLogin }) {
                   <span className="font-bold text-black block">For Google OAuth 2.0:</span>
                   <p className="text-black/70">
                     1. Go to <strong>Google Cloud Console &rarr; Credentials &rarr; OAuth 2.0 Client ID</strong><br />
-                    2. Authorized redirect URI: <code className="text-blue-700 bg-white px-1 rounded">http://localhost:5000/api/auth/google/callback</code><br />
-                    3. Set <code className="text-black font-bold">GOOGLE_CLIENT_ID</code> and <code className="text-black font-bold">GOOGLE_CLIENT_SECRET</code> in <code className="text-black font-bold">server/.env</code>.
+                    2. Authorized redirect URIs:<br />
+                    • Production: <code className="text-blue-700 bg-white px-1 rounded break-all">https://placement-preparation-dashboard-five.vercel.app/api/auth/google/callback</code><br />
+                    • Localhost: <code className="text-blue-700 bg-white px-1 rounded">http://localhost:5000/api/auth/google/callback</code><br />
+                    3. Set <code className="text-black font-bold">GOOGLE_CLIENT_ID</code> and <code className="text-black font-bold">GOOGLE_CLIENT_SECRET</code> in Vercel Environment Variables.
                   </p>
                 </div>
 
