@@ -19,6 +19,7 @@ import {
   ChevronDown,
   ChevronUp
 } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import { MetricCard } from '../components/common/MetricCard';
 import { ProgressBar } from '../components/common/ProgressBar';
 import { Badge, DifficultyBadge, StatusBadge } from '../components/common/Badge';
@@ -60,9 +61,32 @@ export function DSA({ dsaHook }) {
     updateProblem
   } = dsaHook;
 
-  const [activeTab, setActiveTab] = useState('problems'); // 'problems' | 'platforms' | 'sheets' | 'topics'
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get('tab') || 'problems'; // 'problems' | 'platforms' | 'sheets' | 'topics'
+  const setActiveTab = (tab) => {
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev);
+      if (tab === 'problems') next.delete('tab');
+      else next.set('tab', tab);
+      return next;
+    }, { replace: false });
+  };
+
+  const selectedSheetId = searchParams.get('sheet') || null;
+  const setSelectedSheetId = (sheetId) => {
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev);
+      if (sheetId) {
+        next.set('tab', 'sheets');
+        next.set('sheet', sheetId);
+      } else {
+        next.delete('sheet');
+      }
+      return next;
+    }, { replace: false });
+  };
+
   const [showAddModal, setShowAddModal] = useState(false);
-  const [selectedSheetId, setSelectedSheetId] = useState(null); // 'all_unique' | 'striver_sde' | 'blind_75' | 'neetcode_150' | 'cp_essentials' | null
   const [curatedSearchQuery, setCuratedSearchQuery] = useState('');
   const [expandedTopicId, setExpandedTopicId] = useState(null);
 

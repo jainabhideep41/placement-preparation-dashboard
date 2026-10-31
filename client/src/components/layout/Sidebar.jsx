@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
   Code2,
@@ -19,15 +20,22 @@ export function Sidebar({
   onClose,
   revisionDueCount = 0 
 }) {
+  const location = useLocation();
+  const currentPath = location.pathname.toLowerCase();
+
   const navItems = [
     {
       id: 'dashboard',
+      path: '/dashboard',
+      aliases: ['/', '/dashboard'],
       label: 'Dashboard',
       icon: LayoutDashboard,
       badge: null
     },
     {
       id: 'dsa',
+      path: '/dsa',
+      aliases: ['/dsa'],
       label: 'DSA Preparation',
       icon: Code2,
       badge: revisionDueCount > 0 ? `${revisionDueCount} due` : null,
@@ -35,30 +43,40 @@ export function Sidebar({
     },
     {
       id: 'webdev',
+      path: '/webdev',
+      aliases: ['/webdev', '/web-development'],
       label: 'Web Development',
       icon: Globe2,
       badge: 'Roadmap'
     },
     {
       id: 'systemdesign',
+      path: '/system-design',
+      aliases: ['/system-design', '/systemdesign'],
       label: 'System Design',
       icon: ServerCog,
       badge: 'HLD/LLD'
     },
     {
       id: 'github',
+      path: '/github',
+      aliases: ['/github', '/github-foss'],
       label: 'GitHub & FOSS',
       icon: GitBranch,
       badge: 'Active'
     },
     {
       id: 'readiness',
+      path: '/readiness',
+      aliases: ['/readiness', '/placement-readiness'],
       label: 'Placement Readiness',
       icon: Award,
       badge: 'Engine'
     },
     {
       id: 'settings',
+      path: '/settings',
+      aliases: ['/settings'],
       label: 'Settings & Handles',
       icon: Settings,
       badge: null
@@ -97,12 +115,16 @@ export function Sidebar({
           <nav className="space-y-1">
             {navItems.map(item => {
               const Icon = item.icon;
-              const isActive = activePage === item.id;
+              const isActive = item.path === '/dashboard'
+                ? (currentPath === '/' || currentPath === '/dashboard')
+                : (currentPath === item.path || (item.aliases && item.aliases.includes(currentPath)) || currentPath.startsWith(item.path));
+
               return (
-                <button
+                <Link
                   key={item.id}
+                  to={item.path}
                   onClick={() => {
-                    onNavigate(item.id);
+                    if (onNavigate) onNavigate(item.id);
                     if (onClose) onClose();
                   }}
                   className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium transition-all ${
@@ -128,7 +150,7 @@ export function Sidebar({
                       {item.badge}
                     </span>
                   )}
-                </button>
+                </Link>
               );
             })}
           </nav>

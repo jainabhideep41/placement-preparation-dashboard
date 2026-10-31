@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { Navbar } from './components/layout/Navbar';
 import { Sidebar } from './components/layout/Sidebar';
 import { Dashboard } from './pages/Dashboard';
@@ -18,6 +19,9 @@ import { useProgress } from './hooks/useProgress';
 import { useLocalCache } from './hooks/useLocalCache';
 
 export function App() {
+  const navigate = useNavigate();
+  const location = useLocation();
+
   const [currentUser, setCurrentUser] = useLocalCache('prep_auth_user', null);
   const [handles, setHandles] = useLocalCache('prep_user_handles', {
     codeforces: '',
@@ -25,7 +29,6 @@ export function App() {
     github: ''
   });
 
-  const [activePage, setActivePage] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [onboardingUser, setOnboardingUser] = useState(null);
 
@@ -58,6 +61,7 @@ export function App() {
     window.localStorage.removeItem('prep_dsa_cache');
     setTimeout(() => {
       handleRefreshAll();
+      navigate('/dashboard');
     }, 100);
   };
 
@@ -145,6 +149,23 @@ export function App() {
     window.localStorage.removeItem('prep_dsa_cache');
     window.localStorage.removeItem('prep_webdev_state');
     window.localStorage.removeItem('prep_sysdesign_state');
+    navigate('/login');
+  };
+
+  const handleNavigate = (pageOrPath) => {
+    const pathMap = {
+      dashboard: '/dashboard',
+      dsa: '/dsa',
+      webdev: '/webdev',
+      systemdesign: '/system-design',
+      'system-design': '/system-design',
+      github: '/github',
+      readiness: '/readiness',
+      settings: '/settings'
+    };
+    const target = pathMap[pageOrPath] || (pageOrPath.startsWith('/') ? pageOrPath : `/${pageOrPath}`);
+    navigate(target);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   // If first-time OAuth onboarding is active, show the OnboardingModal
@@ -154,7 +175,12 @@ export function App() {
 
   // If student is not logged in, render the Login / Registration page!
   if (!currentUser) {
-    return <Login onLogin={handleLogin} />;
+    return (
+      <Routes>
+        <Route path="/login" element={<Login onLogin={handleLogin} />} />
+        <Route path="*" element={<Login onLogin={handleLogin} />} />
+      </Routes>
+    );
   }
 
   const readinessScore = dashboardHook.data?.readiness?.overallScore || 0;
@@ -176,46 +202,50 @@ export function App() {
       />
 
       <div className="flex flex-1 relative">
-        {/* Navigation Sidebar */}
+        {/* Navigation Sidebar with Real Router Links */}
         <Sidebar
-          activePage={activePage}
-          onNavigate={(pageId) => {
-            setActivePage(pageId);
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          }}
+          onNavigate={handleNavigate}
           isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
           revisionDueCount={dsaHook.dueRevisionCount}
         />
 
-        {/* Main Content Area */}
+        {/* Main Content Area with Real URL Routes */}
         <main className="flex-1 lg:pl-64 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full transition-all">
-          {/* Conditional Rendering of Active Page (Fulfills Topic 7 requirement) */}
-          {activePage === 'dashboard' && (
-            <Dashboard
-              dashboardData={dashboardHook.data}
-              loading={dashboardHook.loading}
-              onNavigate={setActivePage}
-              onRefreshAll={handleRefreshAll}
+          <Routes>
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route
+              path="/dashboard"
+              element={
+                <Dashboard
+                  dashboardData={dashboardHook.data}
+                  loading={dashboardHook.loading}
+                  onNavigate={handleNavigate}
+                  onRefreshAll={handleRefreshAll}
+                />
+              }
             />
-          )}
-
-          {activePage === 'dsa' && <DSA dsaHook={dsaHook} />}
-
-          {activePage === 'webdev' && <WebDevelopment progressHook={progressHook} />}
-
-          {activePage === 'systemdesign' && <SystemDesign progressHook={progressHook} />}
-
-          {activePage === 'github' && <GitHubFOSS />}
-
-          {activePage === 'readiness' && (
-            <PlacementReadiness
-              dashboardData={dashboardHook.data}
-              onNavigate={setActivePage}
+            <Route path="/dsa" element={<DSA dsaHook={dsaHook} />} />
+            <Route path="/webdev" element={<WebDevelopment progressHook={progressHook} />} />
+            <Route path="/web-development" element={<Navigate to="/webdev" replace />} />
+            <Route path="/system-design" element={<SystemDesign progressHook={progressHook} />} />
+            <Route path="/systemdesign" element={<Navigate to="/system-design" replace />} />
+            <Route path="/github" element={<GitHubFOSS />} />
+            <Route path="/github-foss" element={<Navigate to="/github" replace />} />
+            <Route
+              path="/readiness"
+              element={
+                <PlacementReadiness
+                  dashboardData={dashboardHook.data}
+                  onNavigate={handleNavigate}
+                />
+              }
             />
-          )}
-
-          {activePage === 'settings' && <Settings onRefreshAll={handleRefreshAll} />}
+            <Route path="/placement-readiness" element={<Navigate to="/readiness" replace />} />
+            <Route path="/settings" element={<Settings onRefreshAll={handleRefreshAll} />} />
+            <Route path="/login" element={<Navigate to="/dashboard" replace />} />
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          </Routes>
         </main>
       </div>
     </div>

@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { 
   Search, 
   RotateCw, 
@@ -55,7 +56,7 @@ export function Navbar({
           {isSidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
         </button>
 
-        <div className="flex items-center gap-2.5">
+        <Link to="/dashboard" className="flex items-center gap-2.5 hover:opacity-90 transition-opacity">
           <div className="w-8 h-8 rounded-lg bg-black flex items-center justify-center shadow-[2px_2px_0px_rgba(0,0,0,0.3)]">
             <Terminal className="w-4 h-4 text-white" />
           </div>
@@ -72,7 +73,7 @@ export function Navbar({
               Placement Preparation & Dev Portfolio
             </p>
           </div>
-        </div>
+        </Link>
       </div>
 
       {/* Middle search bar */}
