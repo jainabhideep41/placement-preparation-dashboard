@@ -42,6 +42,8 @@ export function saveUserToRegistry(user) {
     targetRole: user.targetRole || existing?.targetRole || 'Software Development Engineer (SDE-1)',
     providers: updatedProviders,
     provider: user.provider || existing?.provider || 'email',
+    password: user.password || existing?.password || null,
+    emailVerified: user.emailVerified ?? existing?.emailVerified ?? (user.provider === 'google' || user.provider === 'github'),
     handles: {
       leetcode: user.handles?.leetcode || existing?.handles?.leetcode || '',
       codeforces: user.handles?.codeforces || existing?.handles?.codeforces || '',
@@ -60,4 +62,23 @@ export function saveUserToRegistry(user) {
   }
 
   return merged;
+}
+
+export function updateUserPasswordInRegistry(email, newPassword) {
+  const emailKey = normalizeEmail(email);
+  const users = getRegisteredUsers();
+  const existing = users[emailKey];
+
+  if (existing) {
+    existing.password = newPassword;
+    existing.lastPasswordResetAt = new Date().toISOString();
+    users[emailKey] = existing;
+    try {
+      window.localStorage.setItem('prep_registered_users', JSON.stringify(users));
+    } catch (e) {
+      console.warn('Could not persist updated password:', e);
+    }
+    return existing;
+  }
+  return null;
 }

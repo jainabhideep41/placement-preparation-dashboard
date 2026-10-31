@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { findUserByEmail, saveUserToRegistry } from '../utils/accountManager';
+import { findUserByEmail, saveUserToRegistry, updateUserPasswordInRegistry } from '../utils/accountManager';
 import { 
   Terminal, 
   Code2, 
@@ -11,13 +11,13 @@ import {
   X,
   ChevronDown,
   ChevronUp,
-  ExternalLink,
-  Sparkles,
-  Zap,
   CheckCircle2,
   Send,
   MailCheck,
-  RefreshCw
+  RefreshCw,
+  KeyRound,
+  ShieldCheck,
+  ArrowLeft
 } from 'lucide-react';
 
 function GoogleIcon({ className = "w-5 h-5" }) {
@@ -66,24 +66,61 @@ export function Login({ onLogin }) {
   const [githubHandle, setGithubHandle] = useState('');
   const [targetRole, setTargetRole] = useState('Software Development Engineer (SDE-1)');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState(false);
 
-  // GitHub Fallback Modal (only if GitHub app not configured on server)
-  const [showGhModal, setShowGhModal] = useState(false);
-  const [customGhUser, setCustomGhUser] = useState('');
+  // Registration Verification Modal State (Password Sign-Up)
+  const [showRegVerifyModal, setShowRegVerifyModal] = useState(false);
+  const [regVerifyCode, setRegVerifyCode] = useState('');
+  const [regVerifyLoading, setRegVerifyLoading] = useState(false);
+  const [regVerifyError, setRegVerifyError] = useState('');
+  const [regVerifySuccess, setRegVerifySuccess] = useState('');
+  const [regCooldown, setRegCooldown] = useState(0);
+  const [testOtpNotice, setTestOtpNotice] = useState('');
 
-  // Resend Email Modal state
+  // Forgot Password Modal State
+  const [showForgotModal, setShowForgotModal] = useState(false);
+  const [forgotStep, setForgotStep] = useState(1); // 1: enter email, 2: enter code & new password
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotCode, setForgotCode] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotError, setForgotError] = useState('');
+  const [forgotSuccess, setForgotSuccess] = useState('');
+  const [forgotCooldown, setForgotCooldown] = useState(0);
+  const [forgotTestOtp, setForgotTestOtp] = useState('');
+
+  // Resend Email Modal State
   const [showResendModal, setShowResendModal] = useState(false);
   const [resendEmail, setResendEmail] = useState('');
+  const [resendType, setResendType] = useState('register');
   const [resendCooldown, setResendCooldown] = useState(0);
   const [resendLoading, setResendLoading] = useState(false);
   const [resendMessage, setResendMessage] = useState('');
   const [resendError, setResendError] = useState('');
-  const [verifyCodeInput, setVerifyCodeInput] = useState('');
-  const [codeVerified, setCodeVerified] = useState(false);
-  const [verifyLoading, setVerifyLoading] = useState(false);
 
-  // Timer for 30s resend cooldown countdown
+  // GitHub Fallback Modal (if GitHub app unconfigured on server)
+  const [showGhModal, setShowGhModal] = useState(false);
+  const [customGhUser, setCustomGhUser] = useState('');
+
+  // Cooldown countdown timers
+  useEffect(() => {
+    if (regCooldown <= 0) return;
+    const interval = setInterval(() => {
+      setRegCooldown((prev) => (prev > 1 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [regCooldown]);
+
+  useEffect(() => {
+    if (forgotCooldown <= 0) return;
+    const interval = setInterval(() => {
+      setForgotCooldown((prev) => (prev > 1 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [forgotCooldown]);
+
   useEffect(() => {
     if (resendCooldown <= 0) return;
     const interval = setInterval(() => {
@@ -91,85 +128,6 @@ export function Login({ onLogin }) {
     }, 1000);
     return () => clearInterval(interval);
   }, [resendCooldown]);
-
-  const handleResendEmail = async (e) => {
-    if (e) e.preventDefault();
-    const targetEmail = (resendEmail.trim() || email.trim()).toLowerCase();
-    if (!targetEmail || !targetEmail.includes('@')) {
-      setResendError('Please enter a valid email address');
-      return;
-    }
-
-    setResendLoading(true);
-    setResendError('');
-    setResendMessage('');
-
-    try {
-      const res = await fetch('/api/auth/resend-verification', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: targetEmail })
-      });
-
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setResendMessage(data.message || `Verification email sent to ${targetEmail}!`);
-        setResendCooldown(data.cooldownSeconds || 30);
-      } else {
-        setResendError(data.message || 'Failed to send verification email. Try again.');
-        if (data.remainingCooldown) setResendCooldown(data.remainingCooldown);
-      }
-    } catch (err) {
-      setResendError('Could not connect to server. Please try again.');
-    } finally {
-      setResendLoading(false);
-    }
-  };
-
-  const handleVerifyCode = async (e) => {
-    if (e) e.preventDefault();
-    const targetEmail = (resendEmail.trim() || email.trim()).toLowerCase();
-    if (!verifyCodeInput.trim()) {
-      setResendError('Please enter the 6-digit verification code');
-      return;
-    }
-
-    setVerifyLoading(true);
-    setResendError('');
-
-    try {
-      const res = await fetch('/api/auth/verify-email-code', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: targetEmail,
-          code: verifyCodeInput.trim()
-        })
-      });
-
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setCodeVerified(true);
-        setResendMessage('Email successfully verified! Signing you in...');
-        setTimeout(() => {
-          const user = findUserByEmail(targetEmail) || saveUserToRegistry({
-            email: targetEmail,
-            name: targetEmail.split('@')[0],
-            provider: 'email',
-            onboardingCompleted: true
-          });
-          setShowResendModal(false);
-          onLogin(user);
-        }, 1000);
-      } else {
-        setResendError(data.message || 'Invalid or expired code');
-      }
-    } catch (err) {
-      setResendError('Failed to verify code. Please try again.');
-    } finally {
-      setVerifyLoading(false);
-    }
-  };
 
   // Handle URL errors/info
   useEffect(() => {
@@ -192,7 +150,6 @@ export function Login({ onLogin }) {
   const handleGoogleClick = () => {
     setError('');
     setOauthLoading(true);
-    // Directly navigate to Google OAuth endpoint
     window.location.href = '/api/auth/google';
   };
 
@@ -215,7 +172,8 @@ export function Login({ onLogin }) {
     }
   };
 
-  const handleEmailSubmit = (e) => {
+  // --- 1. SIGN IN (EMAIL + PASSWORD) ---
+  const handleSignIn = async (e) => {
     e.preventDefault();
     if (!email.trim()) {
       setError('Please provide a valid email address');
@@ -225,83 +183,347 @@ export function Login({ onLogin }) {
     const cleanEmail = email.trim().toLowerCase();
     const existing = findUserByEmail(cleanEmail);
 
-    const unifiedUser = saveUserToRegistry({
-      ...existing,
-      name: name.trim() || existing?.name || cleanEmail.split('@')[0],
-      email: cleanEmail,
-      targetRole: targetRole || existing?.targetRole || 'Software Development Engineer (SDE-1)',
-      provider: 'email',
-      avatarUrl: existing?.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(name || cleanEmail.split('@')[0])}&background=111&color=fff`,
-      handles: {
-        leetcode: leetcodeHandle.trim() || existing?.handles?.leetcode || '',
-        codeforces: codeforcesHandle.trim() || existing?.handles?.codeforces || '',
-        github: githubHandle.trim() || existing?.handles?.github || ''
-      },
-      onboardingCompleted: true
-    });
-
-    try {
-      fetch('/api/auth/register-or-login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: unifiedUser.email,
-          name: unifiedUser.name,
-          handles: unifiedUser.handles,
-          targetRole: unifiedUser.targetRole,
-          provider: 'email'
-        })
-      }).catch(() => {});
-    } catch (e) {
-      // offline fallback
+    // If existing user has a password set locally, verify it
+    if (existing && existing.password && password) {
+      if (existing.password !== password) {
+        setError('Incorrect password. Click "Forgot?" below to reset it.');
+        return;
+      }
     }
 
-    onLogin(unifiedUser);
-  };
-
-  const handleInstantGhSubmit = async (e) => {
-    e.preventDefault();
-    setOauthLoading(true);
+    setLoading(true);
     setError('');
 
     try {
-      const ghUser = customGhUser.trim() || 'torvalds';
-      let studentUser = {
-        id: `gh_${Date.now()}`,
-        name: ghUser,
-        email: `${ghUser}@users.noreply.github.com`,
-        targetRole: 'Software Development Engineer (SDE-1)',
-        provider: 'github',
-        avatarUrl: `https://github.com/${encodeURIComponent(ghUser)}.png`,
-        handles: {
-          leetcode: '',
-          codeforces: '',
-          github: ghUser
-        },
-        loggedInAt: new Date().toISOString()
-      };
+      // Sync with server user store
+      const res = await fetch('/api/auth/register-or-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: cleanEmail,
+          name: existing?.name || cleanEmail.split('@')[0],
+          handles: existing?.handles || {},
+          targetRole: existing?.targetRole || targetRole,
+          password: password || existing?.password,
+          provider: 'email'
+        })
+      });
+      const data = await res.json();
 
-      try {
-        const ghRes = await fetch(`https://api.github.com/users/${encodeURIComponent(ghUser)}`);
-        if (ghRes.ok) {
-          const ghData = await ghRes.json();
-          studentUser.name = ghData.name || ghData.login;
-          studentUser.email = ghData.email || `${ghData.login}@users.noreply.github.com`;
-          studentUser.avatarUrl = ghData.avatar_url;
-        }
-      } catch (e) {
-        // use fallback
-      }
+      const studentUser = saveUserToRegistry({
+        ...existing,
+        ...(data?.user || {}),
+        email: cleanEmail,
+        name: existing?.name || data?.user?.name || cleanEmail.split('@')[0],
+        onboardingCompleted: true
+      });
 
-      setShowGhModal(false);
       onLogin(studentUser);
     } catch (err) {
-      setError(err.message);
+      // Fallback offline sign in
+      const studentUser = saveUserToRegistry({
+        ...existing,
+        email: cleanEmail,
+        name: existing?.name || cleanEmail.split('@')[0],
+        onboardingCompleted: true
+      });
+      onLogin(studentUser);
     } finally {
-      setOauthLoading(false);
+      setLoading(false);
     }
   };
 
+  // --- 2. CREATE ACCOUNT (TRIGGER EMAIL VERIFICATION OTP) ---
+  const handleCreateAccountRequest = async (e) => {
+    e.preventDefault();
+    if (!email.trim() || !email.includes('@')) {
+      setError('Please provide a valid email address');
+      return;
+    }
+
+    if (!password || password.length < 6) {
+      setError('Password must be at least 6 characters long');
+      return;
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    setLoading(true);
+    setError('');
+
+    try {
+      const res = await fetch('/api/auth/register-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: cleanEmail,
+          password,
+          name: name.trim() || cleanEmail.split('@')[0],
+          handles: {
+            leetcode: leetcodeHandle.trim(),
+            codeforces: codeforcesHandle.trim(),
+            github: githubHandle.trim()
+          },
+          targetRole
+        })
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        setRegCooldown(data.cooldownSeconds || 30);
+        setTestOtpNotice(data.testOtp || '');
+        setRegVerifySuccess(`Verification code sent to ${cleanEmail}. Check your inbox or spam.`);
+        setRegVerifyError('');
+        setRegVerifyCode('');
+        setShowRegVerifyModal(true);
+      } else {
+        setError(data.message || 'Failed to dispatch verification email');
+      }
+    } catch (err) {
+      setError('Could not connect to server. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // --- 3. VERIFY REGISTRATION CODE (COMPLETES ACCOUNT & SENDS WELCOME EMAIL) ---
+  const handleVerifyRegistrationCode = async (e) => {
+    if (e) e.preventDefault();
+    const cleanEmail = email.trim().toLowerCase();
+
+    if (!regVerifyCode.trim() || regVerifyCode.trim().length < 6) {
+      setRegVerifyError('Please enter the 6-digit verification code');
+      return;
+    }
+
+    setRegVerifyLoading(true);
+    setRegVerifyError('');
+
+    try {
+      const res = await fetch('/api/auth/verify-registration', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: cleanEmail,
+          code: regVerifyCode.trim()
+        })
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        setRegVerifySuccess('Email verified successfully! Welcome to PrepStack.');
+        
+        // Save unified user to local storage registry
+        const registeredUser = saveUserToRegistry({
+          ...(data.user || {}),
+          email: cleanEmail,
+          name: name.trim() || cleanEmail.split('@')[0],
+          password,
+          emailVerified: true,
+          handles: {
+            leetcode: leetcodeHandle.trim(),
+            codeforces: codeforcesHandle.trim(),
+            github: githubHandle.trim()
+          },
+          targetRole,
+          onboardingCompleted: true
+        });
+
+        setTimeout(() => {
+          setShowRegVerifyModal(false);
+          onLogin(registeredUser);
+        }, 800);
+      } else {
+        setRegVerifyError(data.message || 'Invalid or expired code. Please try again.');
+      }
+    } catch (err) {
+      setRegVerifyError('Verification failed. Please check your connection.');
+    } finally {
+      setRegVerifyLoading(false);
+    }
+  };
+
+  // --- 4. RESEND REGISTRATION OTP ---
+  const handleResendRegCode = async () => {
+    const cleanEmail = email.trim().toLowerCase();
+    if (regCooldown > 0) return;
+
+    setRegVerifyLoading(true);
+    setRegVerifyError('');
+
+    try {
+      const res = await fetch('/api/auth/register-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: cleanEmail,
+          password,
+          name: name.trim() || cleanEmail.split('@')[0],
+          handles: {
+            leetcode: leetcodeHandle.trim(),
+            codeforces: codeforcesHandle.trim(),
+            github: githubHandle.trim()
+          },
+          targetRole
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setRegCooldown(data.cooldownSeconds || 30);
+        setTestOtpNotice(data.testOtp || '');
+        setRegVerifySuccess(`New verification code sent to ${cleanEmail}!`);
+      } else {
+        setRegVerifyError(data.message || 'Failed to resend code');
+        if (data.remainingCooldown) setRegCooldown(data.remainingCooldown);
+      }
+    } catch (err) {
+      setRegVerifyError('Could not connect to server.');
+    } finally {
+      setRegVerifyLoading(false);
+    }
+  };
+
+  // --- 5. FORGOT PASSWORD: STEP 1 (REQUEST RESET OTP) ---
+  const handleForgotRequest = async (e) => {
+    e.preventDefault();
+    const targetEmail = (forgotEmail.trim() || email.trim()).toLowerCase();
+
+    if (!targetEmail || !targetEmail.includes('@')) {
+      setForgotError('Please enter a valid email address');
+      return;
+    }
+
+    setForgotLoading(true);
+    setForgotError('');
+    setForgotSuccess('');
+
+    try {
+      const res = await fetch('/api/auth/forgot-password-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: targetEmail })
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        setForgotCooldown(data.cooldownSeconds || 30);
+        setForgotTestOtp(data.testOtp || '');
+        setForgotSuccess(`Password reset code sent to ${targetEmail}. Check your inbox.`);
+        setForgotStep(2);
+      } else {
+        setForgotError(data.message || 'Failed to dispatch reset code');
+      }
+    } catch (err) {
+      setForgotError('Could not connect to server.');
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
+  // --- 6. FORGOT PASSWORD: STEP 2 (VERIFY CODE & SET NEW PASSWORD) ---
+  const handleResetPasswordSubmit = async (e) => {
+    e.preventDefault();
+    const targetEmail = (forgotEmail.trim() || email.trim()).toLowerCase();
+
+    if (!forgotCode.trim() || forgotCode.trim().length < 6) {
+      setForgotError('Please enter the 6-digit verification code');
+      return;
+    }
+
+    if (!newPassword || newPassword.length < 6) {
+      setForgotError('New password must be at least 6 characters');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setForgotError('Passwords do not match');
+      return;
+    }
+
+    setForgotLoading(true);
+    setForgotError('');
+
+    try {
+      const res = await fetch('/api/auth/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: targetEmail,
+          code: forgotCode.trim(),
+          newPassword
+        })
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        setForgotSuccess('Password updated successfully! Signing you in...');
+        updateUserPasswordInRegistry(targetEmail, newPassword);
+
+        setTimeout(() => {
+          const user = findUserByEmail(targetEmail) || saveUserToRegistry({
+            email: targetEmail,
+            name: targetEmail.split('@')[0],
+            password: newPassword,
+            provider: 'email',
+            onboardingCompleted: true
+          });
+          setShowForgotModal(false);
+          onLogin(user);
+        }, 900);
+      } else {
+        setForgotError(data.message || 'Invalid or expired code. Please try again.');
+      }
+    } catch (err) {
+      setForgotError('Could not connect to server.');
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
+  // --- 7. RESEND MODAL HANDLER ---
+  const handleResendModalSubmit = async (e) => {
+    e.preventDefault();
+    const targetEmail = (resendEmail.trim() || email.trim()).toLowerCase();
+
+    if (!targetEmail || !targetEmail.includes('@')) {
+      setResendError('Please enter a valid email address');
+      return;
+    }
+
+    setResendLoading(true);
+    setResendError('');
+    setResendMessage('');
+
+    try {
+      const res = await fetch('/api/auth/resend-verification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: targetEmail,
+          type: resendType
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setResendMessage(`Verification email sent to ${targetEmail}! Code: ${data.testOtp || 'sent to inbox'}`);
+        setResendCooldown(data.cooldownSeconds || 30);
+      } else {
+        setResendError(data.message || 'Failed to dispatch email');
+        if (data.remainingCooldown) setResendCooldown(data.remainingCooldown);
+      }
+    } catch (err) {
+      setResendError('Could not connect to server.');
+    } finally {
+      setResendLoading(false);
+    }
+  };
+
+  // --- 8. DEMO PRESETS ---
   const handleDemoPreset = (preset) => {
     if (preset === 'fresh') {
       onLogin({
@@ -335,7 +557,7 @@ export function Login({ onLogin }) {
       {/* Background decoration */}
       <div className="absolute inset-0 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:24px_24px] opacity-70 pointer-events-none" />
 
-      {/* Main Card */}
+      {/* Main Auth Card */}
       <div className="w-full max-w-[420px] bg-white rounded-2xl border border-gray-200/80 shadow-[0_8px_30px_rgb(0,0,0,0.06)] p-7 sm:p-8 relative z-10 space-y-6">
         
         {/* Header */}
@@ -424,8 +646,9 @@ export function Login({ onLogin }) {
           </div>
         )}
 
-        {/* Form */}
-        <form onSubmit={handleEmailSubmit} className="space-y-3.5 text-xs">
+        {/* Auth Form */}
+        <form onSubmit={isRegistering ? handleCreateAccountRequest : handleSignIn} className="space-y-3.5 text-xs">
+          {/* Full Name (Only on Registration) */}
           {isRegistering && (
             <div>
               <label className="block text-gray-700 font-medium mb-1 text-[11px]">
@@ -445,6 +668,7 @@ export function Login({ onLogin }) {
             </div>
           )}
 
+          {/* Email Address */}
           <div>
             <label className="block text-gray-700 font-medium mb-1 text-[11px]">
               Email Address
@@ -462,21 +686,26 @@ export function Login({ onLogin }) {
             </div>
           </div>
 
+          {/* Password */}
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="block text-gray-700 font-medium text-[11px]">
-                Password
+                Password {isRegistering && <span className="text-gray-400 font-normal">(min 6 chars)</span>}
               </label>
               {!isRegistering && (
                 <button
                   type="button"
                   onClick={() => {
-                    setResendEmail(email || '');
-                    setResendError('');
-                    setResendMessage('');
-                    setShowResendModal(true);
+                    setForgotEmail(email || '');
+                    setForgotStep(1);
+                    setForgotError('');
+                    setForgotSuccess('');
+                    setForgotCode('');
+                    setNewPassword('');
+                    setConfirmPassword('');
+                    setShowForgotModal(true);
                   }}
-                  className="text-[11px] text-gray-400 hover:text-black transition-colors cursor-pointer"
+                  className="text-[11px] text-blue-600 hover:text-blue-800 font-medium transition-colors cursor-pointer"
                 >
                   Forgot?
                 </button>
@@ -486,6 +715,7 @@ export function Login({ onLogin }) {
               <Lock className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
               <input
                 type="password"
+                required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••••••"
@@ -549,19 +779,30 @@ export function Login({ onLogin }) {
           {/* Submit Button */}
           <button
             type="submit"
-            className="w-full h-11 mt-2 rounded-xl bg-black hover:bg-neutral-800 text-white font-semibold text-sm flex items-center justify-center gap-2 transition-all duration-150 shadow-xs active:scale-[0.99] cursor-pointer"
+            disabled={loading}
+            className="w-full h-11 mt-2 rounded-xl bg-black hover:bg-neutral-800 text-white font-semibold text-sm flex items-center justify-center gap-2 transition-all duration-150 shadow-xs active:scale-[0.99] disabled:opacity-60 cursor-pointer"
           >
-            <span>{isRegistering ? 'Create Profile & Continue' : 'Sign In'}</span>
-            <ArrowRight className="w-4 h-4" />
+            {loading ? (
+              <>
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                <span>{isRegistering ? 'Sending Verification Code...' : 'Signing in...'}</span>
+              </>
+            ) : (
+              <>
+                <span>{isRegistering ? 'Create Profile & Continue' : 'Sign In'}</span>
+                <ArrowRight className="w-4 h-4" />
+              </>
+            )}
           </button>
 
-          {/* Resend Verification Email Trigger */}
+          {/* Resend Verification Email Trigger Link */}
           <div className="flex items-center justify-center pt-1 text-[11px] text-gray-500">
             <span>Didn't receive verification email?</span>
             <button
               type="button"
               onClick={() => {
                 setResendEmail(email || '');
+                setResendType(isRegistering ? 'register' : 'forgot_password');
                 setResendError('');
                 setResendMessage('');
                 setShowResendModal(true);
@@ -574,35 +815,308 @@ export function Login({ onLogin }) {
         </form>
       </div>
 
-      {/* Subtle Demo Presets */}
-      <div className="mt-6 flex flex-wrap items-center justify-center gap-2 text-xs text-gray-500 z-10">
-        <span>Quick demo accounts:</span>
-        <button
-          type="button"
-          onClick={() => handleDemoPreset('fresh')}
-          className="px-2.5 py-1 rounded-lg bg-white/80 hover:bg-white text-gray-700 border border-gray-200/80 shadow-2xs hover:border-gray-300 font-medium transition-all"
-        >
-          Fresh Student
-        </button>
-        <button
-          type="button"
-          onClick={() => handleDemoPreset('neal')}
-          className="px-2.5 py-1 rounded-lg bg-white/80 hover:bg-white text-gray-700 border border-gray-200/80 shadow-2xs hover:border-gray-300 font-medium transition-all"
-        >
-          Neal Wu (LC #2)
-        </button>
-        <button
-          type="button"
-          onClick={() => handleDemoPreset('tourist')}
-          className="px-2.5 py-1 rounded-lg bg-white/80 hover:bg-white text-gray-700 border border-gray-200/80 shadow-2xs hover:border-gray-300 font-medium transition-all"
-        >
-          Tourist (CF 3300+)
-        </button>
-      </div>
+      {/* --- MODAL 1: REGISTRATION EMAIL VERIFICATION CODE MODAL --- */}
+      {showRegVerifyModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 antialiased">
+          <div className="w-full max-w-sm rounded-2xl bg-white border border-gray-200 shadow-2xl p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            {/* Header */}
+            <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                  <ShieldCheck className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900">Verify Your Email</h3>
+                  <p className="text-[10px] text-gray-500">Step 2 of 2 &bull; Account activation</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowRegVerifyModal(false)}
+                className="p-1 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
 
-      {/* Resend Verification Email Modal */}
+            <p className="text-xs text-gray-600 leading-relaxed">
+              We sent a 6-digit verification code to <strong className="text-gray-900">{email}</strong>. Enter it below to activate your account and receive your welcome email.
+            </p>
+
+            {/* Notifications */}
+            {regVerifySuccess && (
+              <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-start gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
+                <span className="leading-relaxed">{regVerifySuccess}</span>
+              </div>
+            )}
+
+            {regVerifyError && (
+              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-700 flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-rose-500 flex-shrink-0 mt-0.5" />
+                <span className="leading-relaxed">{regVerifyError}</span>
+              </div>
+            )}
+
+            {testOtpNotice && (
+              <div className="p-2.5 rounded-lg bg-gray-50 border border-dashed border-gray-300 text-[11px] text-gray-600 flex items-center justify-between">
+                <span>Code for test / review:</span>
+                <span className="font-mono font-bold tracking-widest text-black bg-white px-2 py-0.5 rounded border border-gray-200">
+                  {testOtpNotice}
+                </span>
+              </div>
+            )}
+
+            {/* OTP Form */}
+            <form onSubmit={handleVerifyRegistrationCode} className="space-y-3.5 text-xs">
+              <div>
+                <label className="block text-[11px] font-medium text-gray-700 mb-1">
+                  6-Digit Verification Code
+                </label>
+                <input
+                  type="text"
+                  maxLength={6}
+                  required
+                  autoFocus
+                  value={regVerifyCode}
+                  onChange={(e) => setRegVerifyCode(e.target.value.replace(/\D/g, ''))}
+                  placeholder="123456"
+                  className="w-full px-3 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-base font-mono tracking-[0.4em] text-center text-gray-900 font-bold focus:outline-none focus:border-black focus:bg-white"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={regVerifyLoading || regVerifyCode.length < 6}
+                className="w-full h-11 rounded-xl bg-black hover:bg-neutral-800 text-white font-semibold text-xs flex items-center justify-center gap-2 transition-all shadow-xs disabled:opacity-50 cursor-pointer"
+              >
+                {regVerifyLoading ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Verifying Code...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Verify &amp; Launch Dashboard</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+
+              <div className="flex items-center justify-between pt-1 text-[11px]">
+                <button
+                  type="button"
+                  onClick={() => setShowRegVerifyModal(false)}
+                  className="text-gray-500 hover:text-gray-800 flex items-center gap-1"
+                >
+                  <ArrowLeft className="w-3 h-3" /> Change email
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleResendRegCode}
+                  disabled={regCooldown > 0 || regVerifyLoading}
+                  className="text-blue-600 hover:text-blue-800 font-semibold disabled:opacity-50"
+                >
+                  {regCooldown > 0 ? `Resend in ${regCooldown}s` : 'Resend Code'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODAL 2: FORGOT PASSWORD MODAL --- */}
+      {showForgotModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 antialiased">
+          <div className="w-full max-w-sm rounded-2xl bg-white border border-gray-200 shadow-2xl p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            {/* Header */}
+            <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-red-50 text-red-600 flex items-center justify-center">
+                  <KeyRound className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900">Reset Password</h3>
+                  <p className="text-[10px] text-gray-500">
+                    {forgotStep === 1 ? 'Step 1: Request Code' : 'Step 2: Set New Password'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowForgotModal(false)}
+                className="p-1 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Notifications */}
+            {forgotSuccess && (
+              <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-start gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
+                <span className="leading-relaxed">{forgotSuccess}</span>
+              </div>
+            )}
+
+            {forgotError && (
+              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-700 flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-rose-500 flex-shrink-0 mt-0.5" />
+                <span className="leading-relaxed">{forgotError}</span>
+              </div>
+            )}
+
+            {forgotTestOtp && forgotStep === 2 && (
+              <div className="p-2.5 rounded-lg bg-gray-50 border border-dashed border-gray-300 text-[11px] text-gray-600 flex items-center justify-between">
+                <span>Code for test / review:</span>
+                <span className="font-mono font-bold tracking-widest text-black bg-white px-2 py-0.5 rounded border border-gray-200">
+                  {forgotTestOtp}
+                </span>
+              </div>
+            )}
+
+            {/* STEP 1: Enter email */}
+            {forgotStep === 1 && (
+              <form onSubmit={handleForgotRequest} className="space-y-3.5 text-xs">
+                <p className="text-xs text-gray-600">
+                  Enter your registered email address and we'll send a 6-digit verification code to reset your password.
+                </p>
+
+                <div>
+                  <label className="block text-[11px] font-medium text-gray-700 mb-1">
+                    Registered Email Address
+                  </label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                    <input
+                      type="email"
+                      required
+                      value={forgotEmail}
+                      onChange={(e) => setForgotEmail(e.target.value)}
+                      placeholder="student@college.edu"
+                      className="w-full pl-9 pr-3 py-2 rounded-xl bg-gray-50 border border-gray-200 text-xs text-gray-900 focus:outline-none focus:border-black focus:bg-white"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={forgotLoading}
+                  className="w-full h-10 rounded-xl bg-black hover:bg-neutral-800 text-white font-medium text-xs flex items-center justify-center gap-2 transition-all shadow-xs disabled:opacity-50 cursor-pointer"
+                >
+                  {forgotLoading ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Sending Code...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-3.5 h-3.5" />
+                      <span>Send Reset Code</span>
+                    </>
+                  )}
+                </button>
+              </form>
+            )}
+
+            {/* STEP 2: Enter code & set new password */}
+            {forgotStep === 2 && (
+              <form onSubmit={handleResetPasswordSubmit} className="space-y-3 text-xs">
+                <div>
+                  <label className="block text-[11px] font-medium text-gray-700 mb-1">
+                    6-Digit Verification Code
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={6}
+                    required
+                    value={forgotCode}
+                    onChange={(e) => setForgotCode(e.target.value.replace(/\D/g, ''))}
+                    placeholder="123456"
+                    className="w-full px-3 py-2 rounded-xl bg-gray-50 border border-gray-200 text-sm font-mono tracking-widest text-center text-gray-900 font-bold focus:outline-none focus:border-black focus:bg-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-medium text-gray-700 mb-1">
+                    New Password (min 6 characters)
+                  </label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                    <input
+                      type="password"
+                      required
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="••••••••••••"
+                      className="w-full pl-9 pr-3 py-2 rounded-xl bg-gray-50 border border-gray-200 text-xs text-gray-900 focus:outline-none focus:border-black focus:bg-white"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-medium text-gray-700 mb-1">
+                    Confirm New Password
+                  </label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                    <input
+                      type="password"
+                      required
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="••••••••••••"
+                      className="w-full pl-9 pr-3 py-2 rounded-xl bg-gray-50 border border-gray-200 text-xs text-gray-900 focus:outline-none focus:border-black focus:bg-white"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={forgotLoading}
+                  className="w-full h-10 rounded-xl bg-black hover:bg-neutral-800 text-white font-medium text-xs flex items-center justify-center gap-2 transition-all shadow-xs disabled:opacity-50 cursor-pointer"
+                >
+                  {forgotLoading ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Updating Password...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Reset Password &amp; Sign In</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </>
+                  )}
+                </button>
+
+                <div className="flex items-center justify-between pt-1 text-[11px]">
+                  <button
+                    type="button"
+                    onClick={() => setForgotStep(1)}
+                    className="text-gray-500 hover:text-gray-800 flex items-center gap-1"
+                  >
+                    <ArrowLeft className="w-3 h-3" /> Back
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleForgotRequest}
+                    disabled={forgotCooldown > 0 || forgotLoading}
+                    className="text-blue-600 hover:text-blue-800 font-semibold disabled:opacity-50"
+                  >
+                    {forgotCooldown > 0 ? `Resend in ${forgotCooldown}s` : 'Resend Code'}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* --- MODAL 3: RESEND VERIFICATION EMAIL MODAL --- */}
       {showResendModal && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 antialiased">
           <div className="w-full max-w-sm rounded-2xl bg-white border border-gray-200 shadow-2xl p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between pb-2 border-b border-gray-100">
               <div className="flex items-center gap-2">
@@ -611,7 +1125,7 @@ export function Login({ onLogin }) {
                 </div>
                 <div>
                   <h3 className="text-sm font-semibold text-gray-900">Resend Verification Email</h3>
-                  <p className="text-[10px] text-gray-500">Account confirmation & login code</p>
+                  <p className="text-[10px] text-gray-500">Account confirmation & login codes</p>
                 </div>
               </div>
               <button
@@ -637,7 +1151,7 @@ export function Login({ onLogin }) {
               </div>
             )}
 
-            <form onSubmit={handleResendEmail} className="space-y-3 text-xs">
+            <form onSubmit={handleResendModalSubmit} className="space-y-3 text-xs">
               <div>
                 <label className="block text-[11px] font-medium text-gray-700 mb-1">
                   Student Email Address
@@ -655,6 +1169,36 @@ export function Login({ onLogin }) {
                 </div>
               </div>
 
+              <div>
+                <label className="block text-[11px] font-medium text-gray-700 mb-1">
+                  Email Purpose
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setResendType('register')}
+                    className={`py-1.5 px-2 rounded-lg border text-[11px] font-medium transition-all ${
+                      resendType === 'register'
+                        ? 'border-black bg-black text-white'
+                        : 'border-gray-200 bg-gray-50 text-gray-700'
+                    }`}
+                  >
+                    Account Verification
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setResendType('forgot_password')}
+                    className={`py-1.5 px-2 rounded-lg border text-[11px] font-medium transition-all ${
+                      resendType === 'forgot_password'
+                        ? 'border-black bg-black text-white'
+                        : 'border-gray-200 bg-gray-50 text-gray-700'
+                    }`}
+                  >
+                    Password Reset
+                  </button>
+                </div>
+              </div>
+
               <button
                 type="submit"
                 disabled={resendLoading || resendCooldown > 0}
@@ -666,48 +1210,22 @@ export function Login({ onLogin }) {
                     <span>Sending email...</span>
                   </>
                 ) : resendCooldown > 0 ? (
-                  <span>Resend email in {resendCooldown}s</span>
+                  <span>Resend in {resendCooldown}s</span>
                 ) : (
                   <>
                     <Send className="w-3.5 h-3.5" />
-                    <span>Send Verification Email</span>
+                    <span>Send Email Now</span>
                   </>
                 )}
               </button>
             </form>
-
-            {/* Verification code input if sent */}
-            {resendMessage && (
-              <form onSubmit={handleVerifyCode} className="pt-3 border-t border-gray-100 space-y-2.5 text-xs">
-                <label className="block text-[11px] font-medium text-gray-700">
-                  Enter 6-digit Code from Email
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    maxLength={6}
-                    value={verifyCodeInput}
-                    onChange={(e) => setVerifyCodeInput(e.target.value)}
-                    placeholder="e.g. 583921"
-                    className="flex-1 px-3 py-2 rounded-xl bg-gray-50 border border-gray-200 text-xs font-mono tracking-widest text-center text-gray-900 focus:outline-none focus:border-black focus:bg-white"
-                  />
-                  <button
-                    type="submit"
-                    disabled={verifyLoading || codeVerified}
-                    className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs transition-all shadow-xs disabled:opacity-50"
-                  >
-                    {verifyLoading ? 'Checking...' : codeVerified ? 'Verified!' : 'Verify & Enter'}
-                  </button>
-                </div>
-              </form>
-            )}
           </div>
         </div>
       )}
 
-      {/* GitHub Fallback Modal (Clean & Minimal) */}
+      {/* --- MODAL 4: GITHUB FALLBACK MODAL --- */}
       {showGhModal && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="w-full max-w-sm rounded-2xl bg-white border border-gray-200 shadow-2xl p-6 space-y-4">
             <div className="flex items-center justify-between pb-2 border-b border-gray-100">
               <div className="flex items-center gap-2">
@@ -727,7 +1245,23 @@ export function Login({ onLogin }) {
               Enter your public GitHub handle to instantly sync your avatar, repositories, and developer activity.
             </p>
 
-            <form onSubmit={handleInstantGhSubmit} className="space-y-3">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const ghUser = customGhUser.trim() || 'torvalds';
+                const student = saveUserToRegistry({
+                  name: ghUser,
+                  email: `${ghUser}@users.noreply.github.com`,
+                  provider: 'github',
+                  avatarUrl: `https://github.com/${encodeURIComponent(ghUser)}.png`,
+                  handles: { leetcode: '', codeforces: '', github: ghUser },
+                  onboardingCompleted: true
+                });
+                setShowGhModal(false);
+                onLogin(student);
+              }}
+              className="space-y-3"
+            >
               <div>
                 <label className="block text-[11px] font-medium text-gray-700 mb-1">
                   GitHub Username
@@ -751,16 +1285,41 @@ export function Login({ onLogin }) {
                 </button>
                 <button
                   type="submit"
-                  disabled={oauthLoading}
                   className="px-4 py-1.5 rounded-lg bg-black hover:bg-neutral-800 text-white text-xs font-medium shadow-xs"
                 >
-                  {oauthLoading ? 'Loading...' : 'Connect Profile'}
+                  Connect Profile
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
+
+      {/* Quick Demo Presets */}
+      <div className="mt-6 flex flex-wrap items-center justify-center gap-2 text-xs text-gray-500 z-10">
+        <span>Quick demo accounts:</span>
+        <button
+          type="button"
+          onClick={() => handleDemoPreset('fresh')}
+          className="px-2.5 py-1 rounded-lg bg-white/80 hover:bg-white text-gray-700 border border-gray-200/80 shadow-2xs hover:border-gray-300 font-medium transition-all cursor-pointer"
+        >
+          Fresh Student
+        </button>
+        <button
+          type="button"
+          onClick={() => handleDemoPreset('neal')}
+          className="px-2.5 py-1 rounded-lg bg-white/80 hover:bg-white text-gray-700 border border-gray-200/80 shadow-2xs hover:border-gray-300 font-medium transition-all cursor-pointer"
+        >
+          Neal Wu (LC #2)
+        </button>
+        <button
+          type="button"
+          onClick={() => handleDemoPreset('tourist')}
+          className="px-2.5 py-1 rounded-lg bg-white/80 hover:bg-white text-gray-700 border border-gray-200/80 shadow-2xs hover:border-gray-300 font-medium transition-all cursor-pointer"
+        >
+          Tourist (CF 3300+)
+        </button>
+      </div>
     </div>
   );
 }

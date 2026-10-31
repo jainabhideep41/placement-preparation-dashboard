@@ -45,6 +45,9 @@ export function saveOrMergeUser(userData) {
       targetRole: userData.targetRole || existing.targetRole || 'Software Development Engineer (SDE-1)',
       providers: updatedProviders,
       provider: userData.provider || existing.provider,
+      password: userData.password || existing.password || null,
+      emailVerified: userData.emailVerified ?? existing.emailVerified ?? false,
+      welcomeEmailSent: userData.welcomeEmailSent ?? existing.welcomeEmailSent ?? false,
       handles: {
         leetcode: userData.handles?.leetcode || existing.handles?.leetcode || '',
         codeforces: userData.handles?.codeforces || existing.handles?.codeforces || '',
@@ -65,6 +68,9 @@ export function saveOrMergeUser(userData) {
     id: userData.id || `usr_${Date.now()}`,
     email: emailKey,
     name: userData.name || emailKey.split('@')[0],
+    password: userData.password || null,
+    emailVerified: userData.emailVerified || (userData.provider === 'google' || userData.provider === 'github'),
+    welcomeEmailSent: userData.welcomeEmailSent || false,
     avatarUrl: userData.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.name || emailKey.split('@')[0])}&background=111&color=fff`,
     targetRole: userData.targetRole || 'Software Development Engineer (SDE-1)',
     providers: [userData.provider || 'email'],
@@ -81,6 +87,46 @@ export function saveOrMergeUser(userData) {
 
   usersByEmail.set(emailKey, newUser);
   return newUser;
+}
+
+/**
+ * Update user password
+ */
+export function updateUserPassword(email, newPassword) {
+  const key = normalizeEmail(email);
+  const user = usersByEmail.get(key);
+  if (!user) return null;
+
+  user.password = newPassword;
+  user.lastPasswordResetAt = new Date().toISOString();
+  usersByEmail.set(key, user);
+  return user;
+}
+
+/**
+ * Mark welcome email as sent
+ */
+export function markWelcomeEmailSent(email) {
+  const key = normalizeEmail(email);
+  const user = usersByEmail.get(key);
+  if (user) {
+    user.welcomeEmailSent = true;
+    usersByEmail.set(key, user);
+  }
+}
+
+/**
+ * Mark email as verified
+ */
+export function markEmailVerified(email) {
+  const key = normalizeEmail(email);
+  const user = usersByEmail.get(key);
+  if (user) {
+    user.emailVerified = true;
+    usersByEmail.set(key, user);
+    return user;
+  }
+  return null;
 }
 
 /**

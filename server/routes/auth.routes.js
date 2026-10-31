@@ -1,5 +1,17 @@
 import express from 'express';
-import { getUserByEmail, saveOrMergeUser, completeUserOnboarding } from '../data/userStore.js';
+import { 
+  getUserByEmail, 
+  saveOrMergeUser, 
+  completeUserOnboarding, 
+  updateUserPassword, 
+  markEmailVerified, 
+  markWelcomeEmailSent 
+} from '../data/userStore.js';
+import { 
+  sendWelcomeEmail, 
+  sendVerificationEmail, 
+  sendPasswordResetEmail 
+} from '../services/email.service.js';
 
 const router = express.Router();
 
@@ -38,6 +50,11 @@ const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET || (
   '8762a01b00118354' + '203c5b2f' + '5d0850ea' + '78b81ccf'
 );
 
+// In-memory verification storage maps:
+// Map<cleanEmail, { code, data, expiresAt, lastSentAt }>
+const registrationCodes = new Map();
+const passwordResetCodes = new Map();
+
 /**
  * GET /api/auth/config
  * Returns OAuth provider status so client knows if live keys are configured
@@ -64,7 +81,6 @@ router.get('/config', (req, res) => {
  */
 router.get('/github', (req, res) => {
   if (!GITHUB_CLIENT_ID || !GITHUB_CLIENT_SECRET) {
-    // Redirect with prompt indicator so client opens interactive sign-in
     return res.redirect(`${getClientUrl(req)}/?oauth_info=github_unconfigured`);
   }
 
@@ -75,7 +91,7 @@ router.get('/github', (req, res) => {
 
 /**
  * GET /api/auth/github/callback
- * Handles GitHub OAuth code exchange
+ * Handles GitHub OAuth code exchange and dispatches Welcome Email for new users
  */
 router.get('/github/callback', async (req, res) => {
   const { code, error } = req.query;
@@ -159,6 +175,16 @@ router.get('/github/callback', async (req, res) => {
       onboardingCompleted: !isNewUser
     });
 
+    // 5. Send Welcome Email on first registration
+    if (isNewUser && (!existing || !existing.welcomeEmailSent)) {
+      sendWelcomeEmail({
+        email,
+        name: studentUser.name,
+        provider: 'github'
+      }).catch((err) => console.warn('[Email Warning]:', err.message));
+      markWelcomeEmailSent(email);
+    }
+
     const userParam = encodeURIComponent(JSON.stringify({
       ...studentUser,
       isNewUser,
@@ -187,7 +213,7 @@ router.get('/google', (req, res) => {
 
 /**
  * GET /api/auth/google/callback
- * Handles Google OAuth code exchange
+ * Handles Google OAuth code exchange and dispatches Welcome Email for new users
  */
 router.get('/google/callback', async (req, res) => {
   const { code, error } = req.query;
@@ -248,6 +274,16 @@ router.get('/google/callback', async (req, res) => {
       onboardingCompleted: !isNewUser
     });
 
+    // 4. Send Welcome Email on first registration
+    if (isNewUser && (!existing || !existing.welcomeEmailSent)) {
+      sendWelcomeEmail({
+        email,
+        name: studentUser.name,
+        provider: 'google'
+      }).catch((err) => console.warn('[Email Warning]:', err.message));
+      markWelcomeEmailSent(email);
+    }
+
     const userParam = encodeURIComponent(JSON.stringify({
       ...studentUser,
       isNewUser,
@@ -263,7 +299,6 @@ router.get('/google/callback', async (req, res) => {
 /**
  * POST /api/auth/instant-oauth
  * Fallback interactive OAuth for viva / instant verification
- * If user gives a GitHub username, fetches public GitHub API to populate real avatar and details
  */
 router.post('/instant-oauth', async (req, res) => {
   const { provider, username, email, name } = req.body;
@@ -324,7 +359,7 @@ router.post('/instant-oauth', async (req, res) => {
 
 /**
  * POST /api/auth/complete-onboarding
- * Completes first-time setup for OAuth users with their competitive programming handles
+ * Completes first-time setup for OAuth users with their CP handles
  */
 router.post('/complete-onboarding', (req, res) => {
   const { email, handles, targetRole } = req.body;
@@ -337,11 +372,343 @@ router.post('/complete-onboarding', (req, res) => {
 });
 
 /**
+ * POST /api/auth/register-request
+ * Step 1: Dispatches 6-digit verification code to student's email before registration
+ */
+router.post('/register-request', async (req, res) => {
+  const { email, password, name, handles, targetRole } = req.body;
+
+  if (!email || !email.includes('@')) {
+    return res.status(400).json({ success: false, message: 'Please provide a valid email address' });
+  }
+
+  if (!password || password.length < 6) {
+    return res.status(400).json({ success: false, message: 'Password must be at least 6 characters long' });
+  }
+
+  const cleanEmail = email.trim().toLowerCase();
+  const now = Date.now();
+  const existingCode = registrationCodes.get(cleanEmail);
+
+  // 30s cooldown check
+  if (existingCode && now - existingCode.lastSentAt < 30000) {
+    const remaining = Math.ceil((30000 - (now - existingCode.lastSentAt)) / 1000);
+    return res.status(429).json({
+      success: false,
+      message: `Please wait ${remaining}s before requesting another verification email.`,
+      remainingCooldown: remaining
+    });
+  }
+
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
+  const expiresAt = now + 15 * 60 * 1000; // 15 minutes
+
+  registrationCodes.set(cleanEmail, {
+    code,
+    data: { email: cleanEmail, password, name, handles, targetRole },
+    expiresAt,
+    lastSentAt: now
+  });
+
+  console.log(`[Auth Register] Generated registration code for ${cleanEmail}: ${code}`);
+
+  // Send verification email
+  const emailResult = await sendVerificationEmail({
+    email: cleanEmail,
+    code,
+    name: name || cleanEmail.split('@')[0]
+  });
+
+  res.json({
+    success: true,
+    message: `Verification code sent to ${cleanEmail}. Please check your inbox or spam folder.`,
+    cooldownSeconds: 30,
+    testOtp: code,
+    emailResult
+  });
+});
+
+/**
+ * POST /api/auth/verify-registration
+ * Step 2: Verifies code, creates unified account, sends Welcome Email, and logs student in
+ */
+router.post('/verify-registration', async (req, res) => {
+  const { email, code } = req.body;
+
+  if (!email || !code) {
+    return res.status(400).json({ success: false, message: 'Email and verification code are required' });
+  }
+
+  const cleanEmail = email.trim().toLowerCase();
+  const entry = registrationCodes.get(cleanEmail);
+
+  if (!entry) {
+    return res.status(400).json({
+      success: false,
+      message: 'No verification code requested for this email, or code expired. Please request a new code.'
+    });
+  }
+
+  if (Date.now() > entry.expiresAt) {
+    registrationCodes.delete(cleanEmail);
+    return res.status(400).json({
+      success: false,
+      message: 'Verification code has expired. Please request a new one.'
+    });
+  }
+
+  if (entry.code !== code.trim()) {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid verification code. Please check your email and try again.'
+    });
+  }
+
+  // Code verified! Create/merge the user
+  const regData = entry.data || {};
+  const user = saveOrMergeUser({
+    email: cleanEmail,
+    name: regData.name || cleanEmail.split('@')[0],
+    password: regData.password,
+    handles: regData.handles,
+    targetRole: regData.targetRole || 'Software Development Engineer (SDE-1)',
+    provider: 'email',
+    emailVerified: true,
+    welcomeEmailSent: true,
+    onboardingCompleted: true
+  });
+
+  // Clean up registration code
+  registrationCodes.delete(cleanEmail);
+
+  // Send Welcome Email
+  sendWelcomeEmail({
+    email: cleanEmail,
+    name: user.name,
+    provider: 'email'
+  }).catch((err) => console.warn('[Welcome Email Warning]:', err.message));
+
+  res.json({
+    success: true,
+    message: 'Email successfully verified! Welcome to PrepStack.',
+    user
+  });
+});
+
+/**
+ * POST /api/auth/forgot-password-request
+ * Step 1: Dispatches 6-digit password reset verification code
+ */
+router.post('/forgot-password-request', async (req, res) => {
+  const { email } = req.body;
+
+  if (!email || !email.includes('@')) {
+    return res.status(400).json({ success: false, message: 'Please provide a valid email address' });
+  }
+
+  const cleanEmail = email.trim().toLowerCase();
+  const now = Date.now();
+  const existingCode = passwordResetCodes.get(cleanEmail);
+
+  // 30s cooldown check
+  if (existingCode && now - existingCode.lastSentAt < 30000) {
+    const remaining = Math.ceil((30000 - (now - existingCode.lastSentAt)) / 1000);
+    return res.status(429).json({
+      success: false,
+      message: `Please wait ${remaining}s before requesting another reset code.`,
+      remainingCooldown: remaining
+    });
+  }
+
+  const user = getUserByEmail(cleanEmail);
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
+  const expiresAt = now + 15 * 60 * 1000; // 15 mins
+
+  passwordResetCodes.set(cleanEmail, {
+    code,
+    expiresAt,
+    lastSentAt: now
+  });
+
+  console.log(`[Auth Forgot Password] Generated reset code for ${cleanEmail}: ${code}`);
+
+  // Send password reset email
+  const emailResult = await sendPasswordResetEmail({
+    email: cleanEmail,
+    code,
+    name: user?.name || cleanEmail.split('@')[0]
+  });
+
+  res.json({
+    success: true,
+    message: `Password reset code sent to ${cleanEmail}. Check your inbox.`,
+    cooldownSeconds: 30,
+    testOtp: code,
+    emailResult
+  });
+});
+
+/**
+ * POST /api/auth/reset-password
+ * Step 2: Verifies reset code and updates the user's password
+ */
+router.post('/reset-password', (req, res) => {
+  const { email, code, newPassword } = req.body;
+
+  if (!email || !code || !newPassword) {
+    return res.status(400).json({
+      success: false,
+      message: 'Email, verification code, and new password are required'
+    });
+  }
+
+  if (newPassword.length < 6) {
+    return res.status(400).json({
+      success: false,
+      message: 'New password must be at least 6 characters long'
+    });
+  }
+
+  const cleanEmail = email.trim().toLowerCase();
+  const entry = passwordResetCodes.get(cleanEmail);
+
+  if (!entry) {
+    return res.status(400).json({
+      success: false,
+      message: 'No active password reset request found. Please request a new code.'
+    });
+  }
+
+  if (Date.now() > entry.expiresAt) {
+    passwordResetCodes.delete(cleanEmail);
+    return res.status(400).json({
+      success: false,
+      message: 'Password reset code has expired. Please request a new one.'
+    });
+  }
+
+  if (entry.code !== code.trim()) {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid verification code. Please check and try again.'
+    });
+  }
+
+  // Update password in user store (or create record if missing)
+  let user = updateUserPassword(cleanEmail, newPassword);
+  if (!user) {
+    user = saveOrMergeUser({
+      email: cleanEmail,
+      password: newPassword,
+      emailVerified: true
+    });
+  }
+
+  passwordResetCodes.delete(cleanEmail);
+
+  console.log(`[Auth Password Reset] Password updated for ${cleanEmail}`);
+
+  res.json({
+    success: true,
+    message: 'Password successfully updated! You can now sign in.',
+    user
+  });
+});
+
+/**
+ * POST /api/auth/resend-verification
+ * Resends verification or reset email with 30s cooldown
+ */
+router.post('/resend-verification', async (req, res) => {
+  const { email, type = 'register' } = req.body;
+
+  if (!email || !email.includes('@')) {
+    return res.status(400).json({ success: false, message: 'Please provide a valid email address' });
+  }
+
+  const cleanEmail = email.trim().toLowerCase();
+  const now = Date.now();
+  const codeMap = type === 'forgot_password' ? passwordResetCodes : registrationCodes;
+  const existing = codeMap.get(cleanEmail);
+
+  if (existing && now - existing.lastSentAt < 30000) {
+    const remaining = Math.ceil((30000 - (now - existing.lastSentAt)) / 1000);
+    return res.status(429).json({
+      success: false,
+      message: `Please wait ${remaining}s before requesting another email.`,
+      remainingCooldown: remaining
+    });
+  }
+
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
+  const expiresAt = now + 15 * 60 * 1000;
+
+  codeMap.set(cleanEmail, {
+    ...(existing || {}),
+    code,
+    expiresAt,
+    lastSentAt: now
+  });
+
+  console.log(`[Resend Email] Dispatched ${type} code for ${cleanEmail}: ${code}`);
+
+  const user = getUserByEmail(cleanEmail);
+  const name = user?.name || cleanEmail.split('@')[0];
+
+  if (type === 'forgot_password') {
+    await sendPasswordResetEmail({ email: cleanEmail, code, name });
+  } else {
+    await sendVerificationEmail({ email: cleanEmail, code, name });
+  }
+
+  res.json({
+    success: true,
+    message: `Verification code sent to ${cleanEmail}. Check your inbox.`,
+    cooldownSeconds: 30,
+    testOtp: code
+  });
+});
+
+/**
+ * POST /api/auth/verify-email-code
+ * Legacy verification compatibility
+ */
+router.post('/verify-email-code', (req, res) => {
+  const { email, code } = req.body;
+  if (!email || !code) {
+    return res.status(400).json({ success: false, message: 'Email and verification code are required' });
+  }
+
+  const cleanEmail = email.trim().toLowerCase();
+  const entry = registrationCodes.get(cleanEmail) || passwordResetCodes.get(cleanEmail);
+
+  if (!entry) {
+    return res.status(400).json({ success: false, message: 'No verification code requested for this email.' });
+  }
+
+  if (Date.now() > entry.expiresAt) {
+    return res.status(400).json({ success: false, message: 'Verification code has expired. Please resend.' });
+  }
+
+  if (entry.code !== code.trim()) {
+    return res.status(400).json({ success: false, message: 'Invalid verification code.' });
+  }
+
+  markEmailVerified(cleanEmail);
+
+  res.json({
+    success: true,
+    message: 'Email successfully verified!',
+    email: cleanEmail
+  });
+});
+
+/**
  * POST /api/auth/register-or-login
- * Unified account registration or login for email/password users
+ * Direct email sign-in / registration
  */
 router.post('/register-or-login', (req, res) => {
-  const { email, name, handles, targetRole, provider = 'email' } = req.body;
+  const { email, name, handles, targetRole, provider = 'email', password } = req.body;
   if (!email) {
     return res.status(400).json({ success: false, message: 'Email is required' });
   }
@@ -352,8 +719,19 @@ router.post('/register-or-login', (req, res) => {
     handles,
     targetRole,
     provider,
+    password,
     onboardingCompleted: true
   });
+
+  const isNew = !user.welcomeEmailSent;
+  if (isNew && user.emailVerified) {
+    sendWelcomeEmail({
+      email: user.email,
+      name: user.name,
+      provider: user.provider || 'email'
+    }).catch(err => console.warn('[Welcome Email Warning]:', err.message));
+    markWelcomeEmailSent(user.email);
+  }
 
   res.json({ success: true, user });
 });
@@ -368,117 +746,6 @@ router.get('/user/:email', (req, res) => {
     return res.status(404).json({ success: false, message: 'User not found' });
   }
   res.json({ success: true, user });
-});
-
-// In-memory verification codes store: Map<email, { code, expiresAt, lastSentAt }>
-const verificationCodes = new Map();
-
-/**
- * POST /api/auth/resend-verification
- * Resends verification email with 30s cooldown protection
- */
-router.post('/resend-verification', async (req, res) => {
-  const { email } = req.body;
-  if (!email || !email.includes('@')) {
-    return res.status(400).json({ success: false, message: 'Please provide a valid email address' });
-  }
-
-  const cleanEmail = email.trim().toLowerCase();
-  const now = Date.now();
-  const existing = verificationCodes.get(cleanEmail);
-
-  // 30-second cooldown check
-  if (existing && now - existing.lastSentAt < 30000) {
-    const remaining = Math.ceil((30000 - (now - existing.lastSentAt)) / 1000);
-    return res.status(429).json({
-      success: false,
-      message: `Please wait ${remaining}s before requesting another email.`,
-      remainingCooldown: remaining
-    });
-  }
-
-  // Generate 6-digit verification code
-  const code = Math.floor(100000 + Math.random() * 900000).toString();
-  const expiresAt = now + 15 * 60 * 1000; // 15 mins
-
-  verificationCodes.set(cleanEmail, {
-    code,
-    expiresAt,
-    lastSentAt: now
-  });
-
-  console.log(`[Email Service] Verification email dispatched to ${cleanEmail} (Code: ${code})`);
-
-  // Optional live sending if RESEND_API_KEY is configured
-  let sentViaResend = false;
-  if (process.env.RESEND_API_KEY) {
-    try {
-      const emailRes = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${process.env.RESEND_API_KEY}`
-        },
-        body: JSON.stringify({
-          from: 'PrepStack <onboarding@resend.dev>',
-          to: [cleanEmail],
-          subject: 'Your PrepStack Verification Code',
-          html: `<div style="font-family: sans-serif; padding: 20px;"><h2>PrepStack Verification</h2><p>Your verification code is: <strong style="font-size: 24px; color: #000; letter-spacing: 2px;">${code}</strong></p><p>This code expires in 15 minutes.</p></div>`
-        })
-      });
-      if (emailRes.ok) sentViaResend = true;
-    } catch (e) {
-      console.warn('[Resend API Warning]:', e.message);
-    }
-  }
-
-  res.json({
-    success: true,
-    message: `Verification email sent to ${cleanEmail}! Please check your inbox or spam folder.`,
-    cooldownSeconds: 30,
-    testOtp: code,
-    sentViaResend
-  });
-});
-
-/**
- * POST /api/auth/verify-email-code
- * Verifies code entered by user
- */
-router.post('/verify-email-code', (req, res) => {
-  const { email, code } = req.body;
-  if (!email || !code) {
-    return res.status(400).json({ success: false, message: 'Email and verification code are required' });
-  }
-
-  const cleanEmail = email.trim().toLowerCase();
-  const entry = verificationCodes.get(cleanEmail);
-
-  if (!entry) {
-    return res.status(400).json({ success: false, message: 'No verification code requested for this email. Click Resend Email to get one.' });
-  }
-
-  if (Date.now() > entry.expiresAt) {
-    return res.status(400).json({ success: false, message: 'Verification code has expired. Please click Resend Email.' });
-  }
-
-  if (entry.code !== code.trim()) {
-    return res.status(400).json({ success: false, message: 'Invalid verification code. Please check and try again.' });
-  }
-
-  verificationCodes.delete(cleanEmail);
-
-  // Mark in userStore if user exists
-  const user = getUserByEmail(cleanEmail);
-  if (user) {
-    user.emailVerified = true;
-  }
-
-  res.json({
-    success: true,
-    message: 'Email successfully verified!',
-    email: cleanEmail
-  });
 });
 
 export default router;
