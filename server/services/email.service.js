@@ -247,8 +247,8 @@ import nodemailer from 'nodemailer';
 // Optional SMTP Transport (e.g. Gmail App Password: smtp.gmail.com)
 let smtpTransporter = null;
 if (process.env.SMTP_USER && (process.env.SMTP_PASS || process.env.GMAIL_APP_PASSWORD)) {
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS || process.env.GMAIL_APP_PASSWORD;
+  const user = process.env.SMTP_USER.trim();
+  const pass = (process.env.SMTP_PASS || process.env.GMAIL_APP_PASSWORD).replace(/\s+/g, '');
   smtpTransporter = nodemailer.createTransport({
     service: 'gmail',
     auth: { user, pass }
