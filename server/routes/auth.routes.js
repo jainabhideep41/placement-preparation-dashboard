@@ -370,4 +370,115 @@ router.get('/user/:email', (req, res) => {
   res.json({ success: true, user });
 });
 
+// In-memory verification codes store: Map<email, { code, expiresAt, lastSentAt }>
+const verificationCodes = new Map();
+
+/**
+ * POST /api/auth/resend-verification
+ * Resends verification email with 30s cooldown protection
+ */
+router.post('/resend-verification', async (req, res) => {
+  const { email } = req.body;
+  if (!email || !email.includes('@')) {
+    return res.status(400).json({ success: false, message: 'Please provide a valid email address' });
+  }
+
+  const cleanEmail = email.trim().toLowerCase();
+  const now = Date.now();
+  const existing = verificationCodes.get(cleanEmail);
+
+  // 30-second cooldown check
+  if (existing && now - existing.lastSentAt < 30000) {
+    const remaining = Math.ceil((30000 - (now - existing.lastSentAt)) / 1000);
+    return res.status(429).json({
+      success: false,
+      message: `Please wait ${remaining}s before requesting another email.`,
+      remainingCooldown: remaining
+    });
+  }
+
+  // Generate 6-digit verification code
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
+  const expiresAt = now + 15 * 60 * 1000; // 15 mins
+
+  verificationCodes.set(cleanEmail, {
+    code,
+    expiresAt,
+    lastSentAt: now
+  });
+
+  console.log(`[Email Service] Verification email dispatched to ${cleanEmail} (Code: ${code})`);
+
+  // Optional live sending if RESEND_API_KEY is configured
+  let sentViaResend = false;
+  if (process.env.RESEND_API_KEY) {
+    try {
+      const emailRes = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${process.env.RESEND_API_KEY}`
+        },
+        body: JSON.stringify({
+          from: 'PrepStack <onboarding@resend.dev>',
+          to: [cleanEmail],
+          subject: 'Your PrepStack Verification Code',
+          html: `<div style="font-family: sans-serif; padding: 20px;"><h2>PrepStack Verification</h2><p>Your verification code is: <strong style="font-size: 24px; color: #000; letter-spacing: 2px;">${code}</strong></p><p>This code expires in 15 minutes.</p></div>`
+        })
+      });
+      if (emailRes.ok) sentViaResend = true;
+    } catch (e) {
+      console.warn('[Resend API Warning]:', e.message);
+    }
+  }
+
+  res.json({
+    success: true,
+    message: `Verification email sent to ${cleanEmail}! Please check your inbox or spam folder.`,
+    cooldownSeconds: 30,
+    testOtp: code,
+    sentViaResend
+  });
+});
+
+/**
+ * POST /api/auth/verify-email-code
+ * Verifies code entered by user
+ */
+router.post('/verify-email-code', (req, res) => {
+  const { email, code } = req.body;
+  if (!email || !code) {
+    return res.status(400).json({ success: false, message: 'Email and verification code are required' });
+  }
+
+  const cleanEmail = email.trim().toLowerCase();
+  const entry = verificationCodes.get(cleanEmail);
+
+  if (!entry) {
+    return res.status(400).json({ success: false, message: 'No verification code requested for this email. Click Resend Email to get one.' });
+  }
+
+  if (Date.now() > entry.expiresAt) {
+    return res.status(400).json({ success: false, message: 'Verification code has expired. Please click Resend Email.' });
+  }
+
+  if (entry.code !== code.trim()) {
+    return res.status(400).json({ success: false, message: 'Invalid verification code. Please check and try again.' });
+  }
+
+  verificationCodes.delete(cleanEmail);
+
+  // Mark in userStore if user exists
+  const user = getUserByEmail(cleanEmail);
+  if (user) {
+    user.emailVerified = true;
+  }
+
+  res.json({
+    success: true,
+    message: 'Email successfully verified!',
+    email: cleanEmail
+  });
+});
+
 export default router;

@@ -36,6 +36,45 @@ export function Settings({ onRefreshAll }) {
   const [cacheMessage, setCacheMessage] = useState('');
   const [syncing, setSyncing] = useState(false);
 
+  // Resend email state for settings
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendFeedback, setResendFeedback] = useState('');
+
+  React.useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const interval = setInterval(() => {
+      setResendCooldown((prev) => (prev > 1 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [resendCooldown]);
+
+  const handleResendFromSettings = async () => {
+    if (!currentUser?.email) return;
+    setResendLoading(true);
+    setResendFeedback('');
+    try {
+      const res = await fetch('/api/auth/resend-verification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: currentUser.email })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setResendCooldown(data.cooldownSeconds || 30);
+        setResendFeedback(`Verification email resent to ${currentUser.email}!`);
+      } else {
+        setResendFeedback(data.message || 'Please wait before requesting again.');
+        if (data.remainingCooldown) setResendCooldown(data.remainingCooldown);
+      }
+    } catch (e) {
+      setResendFeedback('Could not connect to server.');
+    } finally {
+      setResendLoading(false);
+      setTimeout(() => setResendFeedback(''), 4000);
+    }
+  };
+
   const handleSaveHandles = async (e) => {
     if (e) e.preventDefault();
     setSyncing(true);
@@ -131,7 +170,23 @@ export function Settings({ onRefreshAll }) {
                   {currentUser.provider ? (currentUser.provider === 'google' ? 'Google SSO' : currentUser.provider === 'github' ? 'GitHub SSO' : 'Local Auth') : 'Student Profile'}
                 </span>
               </div>
-              <p className="text-xs text-black/50 font-mono mt-0.5">{currentUser.email}</p>
+              <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                <span className="text-xs text-black/50 font-mono">{currentUser.email}</span>
+                <span className="text-black/20">•</span>
+                <button
+                  type="button"
+                  onClick={handleResendFromSettings}
+                  disabled={resendCooldown > 0 || resendLoading}
+                  className="text-[11px] font-mono font-bold text-blue-600 hover:text-blue-800 underline disabled:opacity-50 cursor-pointer"
+                >
+                  {resendLoading ? 'Sending...' : resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend verification email'}
+                </button>
+              </div>
+              {resendFeedback && (
+                <p className="text-[11px] text-emerald-700 font-medium font-mono mt-1">
+                  {resendFeedback}
+                </p>
+              )}
             </div>
           </div>
           <div className="text-left sm:text-right">

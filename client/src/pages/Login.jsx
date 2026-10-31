@@ -14,7 +14,10 @@ import {
   ExternalLink,
   Sparkles,
   Zap,
-  CheckCircle2
+  CheckCircle2,
+  Send,
+  MailCheck,
+  RefreshCw
 } from 'lucide-react';
 
 function GoogleIcon({ className = "w-5 h-5" }) {
@@ -68,6 +71,105 @@ export function Login({ onLogin }) {
   // GitHub Fallback Modal (only if GitHub app not configured on server)
   const [showGhModal, setShowGhModal] = useState(false);
   const [customGhUser, setCustomGhUser] = useState('');
+
+  // Resend Email Modal state
+  const [showResendModal, setShowResendModal] = useState(false);
+  const [resendEmail, setResendEmail] = useState('');
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendMessage, setResendMessage] = useState('');
+  const [resendError, setResendError] = useState('');
+  const [verifyCodeInput, setVerifyCodeInput] = useState('');
+  const [codeVerified, setCodeVerified] = useState(false);
+  const [verifyLoading, setVerifyLoading] = useState(false);
+
+  // Timer for 30s resend cooldown countdown
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const interval = setInterval(() => {
+      setResendCooldown((prev) => (prev > 1 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [resendCooldown]);
+
+  const handleResendEmail = async (e) => {
+    if (e) e.preventDefault();
+    const targetEmail = (resendEmail.trim() || email.trim()).toLowerCase();
+    if (!targetEmail || !targetEmail.includes('@')) {
+      setResendError('Please enter a valid email address');
+      return;
+    }
+
+    setResendLoading(true);
+    setResendError('');
+    setResendMessage('');
+
+    try {
+      const res = await fetch('/api/auth/resend-verification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: targetEmail })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setResendMessage(data.message || `Verification email sent to ${targetEmail}!`);
+        setResendCooldown(data.cooldownSeconds || 30);
+      } else {
+        setResendError(data.message || 'Failed to send verification email. Try again.');
+        if (data.remainingCooldown) setResendCooldown(data.remainingCooldown);
+      }
+    } catch (err) {
+      setResendError('Could not connect to server. Please try again.');
+    } finally {
+      setResendLoading(false);
+    }
+  };
+
+  const handleVerifyCode = async (e) => {
+    if (e) e.preventDefault();
+    const targetEmail = (resendEmail.trim() || email.trim()).toLowerCase();
+    if (!verifyCodeInput.trim()) {
+      setResendError('Please enter the 6-digit verification code');
+      return;
+    }
+
+    setVerifyLoading(true);
+    setResendError('');
+
+    try {
+      const res = await fetch('/api/auth/verify-email-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: targetEmail,
+          code: verifyCodeInput.trim()
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setCodeVerified(true);
+        setResendMessage('Email successfully verified! Signing you in...');
+        setTimeout(() => {
+          const user = findUserByEmail(targetEmail) || saveUserToRegistry({
+            email: targetEmail,
+            name: targetEmail.split('@')[0],
+            provider: 'email',
+            onboardingCompleted: true
+          });
+          setShowResendModal(false);
+          onLogin(user);
+        }, 1000);
+      } else {
+        setResendError(data.message || 'Invalid or expired code');
+      }
+    } catch (err) {
+      setResendError('Failed to verify code. Please try again.');
+    } finally {
+      setVerifyLoading(false);
+    }
+  };
 
   // Handle URL errors/info
   useEffect(() => {
@@ -366,9 +468,18 @@ export function Login({ onLogin }) {
                 Password
               </label>
               {!isRegistering && (
-                <span className="text-[11px] text-gray-400 hover:text-gray-600 cursor-pointer">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setResendEmail(email || '');
+                    setResendError('');
+                    setResendMessage('');
+                    setShowResendModal(true);
+                  }}
+                  className="text-[11px] text-gray-400 hover:text-black transition-colors cursor-pointer"
+                >
                   Forgot?
-                </span>
+                </button>
               )}
             </div>
             <div className="relative">
@@ -443,6 +554,23 @@ export function Login({ onLogin }) {
             <span>{isRegistering ? 'Create Profile & Continue' : 'Sign In'}</span>
             <ArrowRight className="w-4 h-4" />
           </button>
+
+          {/* Resend Verification Email Trigger */}
+          <div className="flex items-center justify-center pt-1 text-[11px] text-gray-500">
+            <span>Didn't receive verification email?</span>
+            <button
+              type="button"
+              onClick={() => {
+                setResendEmail(email || '');
+                setResendError('');
+                setResendMessage('');
+                setShowResendModal(true);
+              }}
+              className="ml-1 text-blue-600 hover:text-blue-800 font-semibold underline cursor-pointer"
+            >
+              Resend email
+            </button>
+          </div>
         </form>
       </div>
 
@@ -471,6 +599,111 @@ export function Login({ onLogin }) {
           Tourist (CF 3300+)
         </button>
       </div>
+
+      {/* Resend Verification Email Modal */}
+      {showResendModal && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white border border-gray-200 shadow-2xl p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                  <MailCheck className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900">Resend Verification Email</h3>
+                  <p className="text-[10px] text-gray-500">Account confirmation & login code</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowResendModal(false)}
+                className="p-1 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {resendMessage && (
+              <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-start gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
+                <span className="leading-relaxed">{resendMessage}</span>
+              </div>
+            )}
+
+            {resendError && (
+              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-700 flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-rose-500 flex-shrink-0 mt-0.5" />
+                <span className="leading-relaxed">{resendError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleResendEmail} className="space-y-3 text-xs">
+              <div>
+                <label className="block text-[11px] font-medium text-gray-700 mb-1">
+                  Student Email Address
+                </label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                  <input
+                    type="email"
+                    required
+                    value={resendEmail}
+                    onChange={(e) => setResendEmail(e.target.value)}
+                    placeholder="student@college.edu"
+                    className="w-full pl-9 pr-3 py-2 rounded-xl bg-gray-50 border border-gray-200 text-xs text-gray-900 focus:outline-none focus:border-black focus:bg-white"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={resendLoading || resendCooldown > 0}
+                className="w-full h-10 rounded-xl bg-black hover:bg-neutral-800 text-white font-medium text-xs flex items-center justify-center gap-2 transition-all shadow-xs disabled:opacity-50 cursor-pointer"
+              >
+                {resendLoading ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Sending email...</span>
+                  </>
+                ) : resendCooldown > 0 ? (
+                  <span>Resend email in {resendCooldown}s</span>
+                ) : (
+                  <>
+                    <Send className="w-3.5 h-3.5" />
+                    <span>Send Verification Email</span>
+                  </>
+                )}
+              </button>
+            </form>
+
+            {/* Verification code input if sent */}
+            {resendMessage && (
+              <form onSubmit={handleVerifyCode} className="pt-3 border-t border-gray-100 space-y-2.5 text-xs">
+                <label className="block text-[11px] font-medium text-gray-700">
+                  Enter 6-digit Code from Email
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    maxLength={6}
+                    value={verifyCodeInput}
+                    onChange={(e) => setVerifyCodeInput(e.target.value)}
+                    placeholder="e.g. 583921"
+                    className="flex-1 px-3 py-2 rounded-xl bg-gray-50 border border-gray-200 text-xs font-mono tracking-widest text-center text-gray-900 focus:outline-none focus:border-black focus:bg-white"
+                  />
+                  <button
+                    type="submit"
+                    disabled={verifyLoading || codeVerified}
+                    className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs transition-all shadow-xs disabled:opacity-50"
+                  >
+                    {verifyLoading ? 'Checking...' : codeVerified ? 'Verified!' : 'Verify & Enter'}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* GitHub Fallback Modal (Clean & Minimal) */}
       {showGhModal && (
