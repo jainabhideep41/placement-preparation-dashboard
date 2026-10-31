@@ -274,14 +274,16 @@ export function Login({ onLogin }) {
         setRegCooldown(data.cooldownSeconds || 30);
         setTestOtpNotice(data.testOtp || '');
         setDeliveryMode(data.emailResult?.mode || (data.sandboxMode ? 'sandbox' : 'smtp'));
+        if (data.testOtp) {
+          setRegVerifyCode(data.testOtp);
+        }
         if (data.sandboxMode || !data.emailResult?.delivered) {
-          setRegVerifyCode(data.testOtp || '');
           setRegVerifySuccess(
-            `Resend Sandbox: Verification code auto-filled [${data.testOtp}]. ${data.forwardedToOwner ? '(Notification copy sent to admin)' : ''}`
+            `Code auto-filled [${data.testOtp}]. ${data.forwardedToOwner ? '(Notification copy sent to admin)' : ''}`
           );
         } else {
           setRegVerifySuccess(
-            `Verification email dispatched to ${cleanEmail}! If using Outlook, please check your Junk Email folder or the "Other" tab.`
+            `Verification email dispatched to ${cleanEmail}! We've also auto-filled your code [${data.testOtp}] below so university firewall delays won't block you.`
           );
         }
         setRegVerifyError('');
@@ -383,12 +385,10 @@ export function Login({ onLogin }) {
       if (res.ok && data.success) {
         setRegCooldown(data.cooldownSeconds || 30);
         setTestOtpNotice(data.testOtp || '');
-        if (data.sandboxMode || !data.emailResult?.delivered) {
-          setRegVerifyCode(data.testOtp || '');
-          setRegVerifySuccess(`New verification code generated & auto-filled: ${data.testOtp}`);
-        } else {
-          setRegVerifySuccess(`New verification code sent to ${cleanEmail}!`);
+        if (data.testOtp) {
+          setRegVerifyCode(data.testOtp);
         }
+        setRegVerifySuccess(`New verification code generated & auto-filled: ${data.testOtp || 'sent'}`);
       } else {
         setRegVerifyError(data.message || 'Failed to resend code');
         if (data.remainingCooldown) setRegCooldown(data.remainingCooldown);
