@@ -1,6 +1,6 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import { memoryCache } from './cache/memoryCache.js';
 import { clearProblemStore } from './data/problemStore.js';
 
@@ -11,8 +11,6 @@ import systemDesignRoutes from './routes/systemdesign.routes.js';
 import githubRoutes from './routes/github.routes.js';
 import readinessRoutes from './routes/readiness.routes.js';
 import authRoutes from './routes/auth.routes.js';
-
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
