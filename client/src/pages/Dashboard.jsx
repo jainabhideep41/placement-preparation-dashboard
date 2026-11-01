@@ -21,6 +21,7 @@ import { Badge } from '../components/common/Badge';
 import { DifficultyDistribution, DonutChart } from '../components/common/Charts';
 import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
 import { RatingGraph } from '../components/dashboard/RatingGraph';
+import { PrimaryMetricCards } from '../components/dashboard/PrimaryMetricCards';
 import { PlacementSprintCard } from '../components/dashboard/PlacementSprintCard';
 import { SpacedRepetitionCard } from '../components/dashboard/SpacedRepetitionCard';
 import { HandleConfigModal } from '../components/dashboard/HandleConfigModal';
@@ -166,130 +167,13 @@ export function Dashboard({ dashboardData, loading, onNavigate, onRefreshAll }) 
       </div>
 
       {/* 2. Four Primary KPI Metric Cards (Refined Modern SaaS) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Readiness Index */}
-        <div 
-          onClick={() => onNavigate('readiness')}
-          className="rounded-2xl bg-white border border-gray-200/90 shadow-xs p-5 hover:border-gray-300 transition-all cursor-pointer group flex flex-col justify-between"
-        >
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
-                Readiness Score
-              </span>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-800">
-                FAANG Diagnostic
-              </span>
-            </div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-extrabold font-mono tracking-tight text-gray-950">
-                {overallScore}%
-              </span>
-              <span className="text-xs font-semibold text-gray-600">
-                {statusTier}
-              </span>
-            </div>
-          </div>
-          <div className="pt-3 border-t border-gray-100 mt-3 flex items-center justify-between text-xs text-gray-500">
-            <span className="font-mono text-[11px]">Weighted 4 Pillars</span>
-            <span className="text-gray-900 group-hover:translate-x-0.5 transition-transform font-medium flex items-center gap-1">
-              View breakdown &rarr;
-            </span>
-          </div>
-        </div>
-
-        {/* DSA Solves */}
-        <div 
-          onClick={() => onNavigate('dsa')}
-          className="rounded-2xl bg-white border border-gray-200/90 shadow-xs p-5 hover:border-gray-300 transition-all cursor-pointer group flex flex-col justify-between"
-        >
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
-                DSA Solves
-              </span>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-800">
-                35% Weight
-              </span>
-            </div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-extrabold font-mono tracking-tight text-gray-950">
-                {(metrics?.totalSolved ?? 0).toLocaleString()}
-              </span>
-              <span className="text-xs font-medium text-gray-500">
-                problems
-              </span>
-            </div>
-          </div>
-          <div className="pt-3 border-t border-gray-100 mt-3 flex items-center justify-between text-[11px] text-gray-500 font-mono">
-            <span>Easy: {metrics?.easy || 0}</span>
-            <span>Med: {metrics?.medium || 0}</span>
-            <span className="text-gray-950 font-bold">Hard: {metrics?.hard || 0}</span>
-          </div>
-        </div>
-
-        {/* System Design */}
-        <div 
-          onClick={() => onNavigate('systemdesign')}
-          className="rounded-2xl bg-white border border-gray-200/90 shadow-xs p-5 hover:border-gray-300 transition-all cursor-pointer group flex flex-col justify-between"
-        >
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
-                System Design
-              </span>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-800">
-                20% Weight
-              </span>
-            </div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-extrabold font-mono tracking-tight text-gray-950">
-                {metrics?.systemTopicsCompleted ?? 0}/{metrics?.systemTopicsTotal || 6}
-              </span>
-              <span className="text-xs font-medium text-gray-500">
-                modules completed
-              </span>
-            </div>
-          </div>
-          <div className="pt-3 border-t border-gray-100 mt-3 flex items-center justify-between text-xs text-gray-500">
-            <span className="font-mono text-[11px]">HLD &amp; Concurrency</span>
-            <span className="text-gray-900 group-hover:translate-x-0.5 transition-transform font-medium flex items-center gap-1">
-              Architecture &rarr;
-            </span>
-          </div>
-        </div>
-
-        {/* GitHub & Open Source */}
-        <div 
-          onClick={() => onNavigate('github')}
-          className="rounded-2xl bg-white border border-gray-200/90 shadow-xs p-5 hover:border-gray-300 transition-all cursor-pointer group flex flex-col justify-between"
-        >
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
-                GitHub &amp; FOSS
-              </span>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-800">
-                10% Weight
-              </span>
-            </div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-extrabold font-mono tracking-tight text-gray-950">
-                {(metrics?.commits ?? 0).toLocaleString()}
-              </span>
-              <span className="text-xs font-medium text-gray-500">
-                commits in 12m
-              </span>
-            </div>
-          </div>
-          <div className="pt-3 border-t border-gray-100 mt-3 flex items-center justify-between text-xs text-gray-500">
-            <span className="font-mono text-[11px]">{metrics?.prs || 0} merged PRs</span>
-            <span className="text-gray-900 group-hover:translate-x-0.5 transition-transform font-medium flex items-center gap-1">
-              Repositories &rarr;
-            </span>
-          </div>
-        </div>
-      </div>
+      <PrimaryMetricCards
+        overallScore={overallScore}
+        statusTier={statusTier}
+        metrics={metrics}
+        calibratedRole={readiness?.calibratedRole}
+        onNavigate={onNavigate}
+      />
 
       {/* 3. Competitive Rating Trajectory Chart (Codeforces + LeetCode Graph) */}
       <RatingGraph 

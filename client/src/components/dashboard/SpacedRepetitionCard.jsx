@@ -1,14 +1,10 @@
 import React from 'react';
 import { 
   Brain, 
-  CheckCircle2, 
-  Clock, 
   ArrowUpRight, 
   Plus, 
-  Zap, 
   BarChart3, 
-  ExternalLink,
-  ShieldCheck,
+  ShieldCheck, 
   Check
 } from 'lucide-react';
 

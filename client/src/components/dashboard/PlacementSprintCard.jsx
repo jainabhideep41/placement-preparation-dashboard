@@ -6,9 +6,6 @@ import {
   Globe2, 
   GitBranch, 
   ArrowUpRight, 
-  ChevronRight,
-  Sparkles,
-  Layers,
   Target,
   ArrowRight
 } from 'lucide-react';
