@@ -69,7 +69,13 @@ export function saveUserToRegistry(user, isExplicitUpdate = false) {
           cgpa: user.academic?.cgpa ?? existing?.academic?.cgpa ?? '8.85 / 10',
           desiredOption: user.academic?.desiredOption ?? existing?.academic?.desiredOption ?? (user.targetRole || existing?.targetRole || 'Software Development Engineer (SDE-1)'),
           dreamCompanies: user.academic?.dreamCompanies ?? existing?.academic?.dreamCompanies ?? 'Google, Microsoft, Uber, Atlassian',
-          workMode: user.academic?.workMode ?? existing?.academic?.workMode ?? 'Hybrid / Remote / On-site'
+          workMode: user.academic?.workMode ?? existing?.academic?.workMode ?? 'Hybrid / Remote / On-site',
+          achievements: (user.academic?.achievements !== undefined || user.achievements !== undefined)
+            ? (user.academic?.achievements ?? user.achievements ?? [])
+            : (existing?.academic?.achievements ?? existing?.achievements ?? []),
+          extracurriculars: (user.academic?.extracurriculars !== undefined || user.extracurriculars !== undefined)
+            ? (user.academic?.extracurriculars ?? user.extracurriculars ?? [])
+            : (existing?.academic?.extracurriculars ?? existing?.extracurriculars ?? [])
         }
       : {
           college: existing?.academic?.college ?? user.academic?.college ?? 'Chandigarh University',
@@ -79,8 +85,20 @@ export function saveUserToRegistry(user, isExplicitUpdate = false) {
           cgpa: existing?.academic?.cgpa ?? user.academic?.cgpa ?? '8.85 / 10',
           desiredOption: existing?.academic?.desiredOption ?? user.academic?.desiredOption ?? (existing?.targetRole || user.targetRole || 'Software Development Engineer (SDE-1)'),
           dreamCompanies: existing?.academic?.dreamCompanies ?? user.academic?.dreamCompanies ?? 'Google, Microsoft, Uber, Atlassian',
-          workMode: existing?.academic?.workMode ?? user.academic?.workMode ?? 'Hybrid / Remote / On-site'
+          workMode: existing?.academic?.workMode ?? user.academic?.workMode ?? 'Hybrid / Remote / On-site',
+          achievements: existing?.academic?.achievements ?? existing?.achievements ?? user.academic?.achievements ?? user.achievements ?? [],
+          extracurriculars: existing?.academic?.extracurriculars ?? existing?.extracurriculars ?? user.academic?.extracurriculars ?? user.extracurriculars ?? []
         },
+    achievements: isExplicitUpdate
+      ? ((user.achievements !== undefined || user.academic?.achievements !== undefined)
+        ? (user.achievements ?? user.academic?.achievements ?? [])
+        : (existing?.achievements ?? existing?.academic?.achievements ?? []))
+      : (existing?.achievements ?? existing?.academic?.achievements ?? user.achievements ?? user.academic?.achievements ?? []),
+    extracurriculars: isExplicitUpdate
+      ? ((user.extracurriculars !== undefined || user.academic?.extracurriculars !== undefined)
+        ? (user.extracurriculars ?? user.academic?.extracurriculars ?? [])
+        : (existing?.extracurriculars ?? existing?.academic?.extracurriculars ?? []))
+      : (existing?.extracurriculars ?? existing?.academic?.extracurriculars ?? user.extracurriculars ?? user.academic?.extracurriculars ?? []),
     providers: updatedProviders,
     provider: existing?.provider || user.provider || 'email',
     password: user.password || existing?.password || null,

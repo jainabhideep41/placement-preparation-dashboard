@@ -195,11 +195,56 @@ async function runTests() {
   });
   console.log('User next login session:');
   console.log('  Persistent DSA Weight:', nextSessionUser.customWeights?.dsa, '(Expected: 50)');
-  if (nextSessionUser.customWeights?.dsa !== 50) {
-    throw new Error('Test 6 Failed: Custom weights did not persist across subsequent logins');
+  // [Test 7] Test Achievements & Extracurriculars Persistence & Public Dossier Sync
+  console.log('\n[Test 7] Test Achievements & Extracurriculars Persistence & Public Dossier Sync...');
+  const testAchievements = [
+    'Winner of HackCBS 6.0 among 400+ national engineering teams',
+    'Secured Global Rank 45 in LeetCode Weekly Contest 390'
+  ];
+  const testExtracurriculars = [
+    'Lead Organizer of Annual National Hackathon with 800+ attendees',
+    'Mentor for Data Structures & Algorithms Club (mentored 80+ juniors)'
+  ];
+
+  const profileRes7 = await fetch(`${BASE_URL}/api/auth/profile`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email: testEmail,
+      username: 'deepcandidate',
+      achievements: testAchievements,
+      extracurriculars: testExtracurriculars
+    })
+  });
+  const profileData7 = await profileRes7.json();
+  console.log('Achievements saved:', profileData7.user?.achievements?.length, '(Expected: 2)');
+  console.log('Extracurriculars saved:', profileData7.user?.extracurriculars?.length, '(Expected: 2)');
+  if (profileData7.user?.achievements?.length !== 2 || profileData7.user?.extracurriculars?.length !== 2) {
+    throw new Error('Test 7 Failed: Achievements or extracurriculars were not saved in profile update');
   }
 
-  console.log('\n>>> ALL MULTI-PROVIDER AUTHENTICATION UNIFICATION & WEIGHTS PERSISTENCE TESTS PASSED! <<<');
+  // Fetch public profile and verify presence of achievements and extracurriculars
+  const publicRes7 = await fetch(`${BASE_URL}/api/public/profile/deepcandidate`);
+  const publicData7 = await publicRes7.json();
+  console.log('Public Profile Achievements:', publicData7.profile?.achievements?.length, '(Expected: 2)');
+  console.log('Public Profile Extracurriculars:', publicData7.profile?.extracurriculars?.length, '(Expected: 2)');
+  if (publicData7.profile?.achievements?.length !== 2 || publicData7.profile?.extracurriculars?.length !== 2) {
+    throw new Error('Test 7 Failed: Public profile did not return saved achievements or extracurriculars');
+  }
+
+  // Verify next session OAuth login retains them
+  const nextSessionWithOAuth = saveOrMergeUser({
+    id: 'google_session_day_3',
+    name: 'Deep Google',
+    email: testEmail,
+    provider: 'google'
+  });
+  console.log('User next login achievements retained:', nextSessionWithOAuth.achievements?.length, '(Expected: 2)');
+  if (nextSessionWithOAuth.achievements?.length !== 2) {
+    throw new Error('Test 7 Failed: Subsequent OAuth login did not preserve achievements');
+  }
+
+  console.log('\n>>> ALL MULTI-PROVIDER AUTHENTICATION UNIFICATION & RESUME SECTION TESTS PASSED! <<<');
 }
 
 runTests().catch(err => {

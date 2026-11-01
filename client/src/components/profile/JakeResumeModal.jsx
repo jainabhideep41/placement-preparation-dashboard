@@ -351,10 +351,10 @@ export function JakeResumeModal({ isOpen, onClose, profile }) {
                   </div>
                 </div>
 
-                {/* 5. Competitive Programming & Achievements */}
+                {/* 5. Achievements & Honors */}
                 <div className="mt-3">
                   <h2 className="text-xs sm:text-sm font-bold uppercase tracking-widest border-b border-black pb-0.5 mb-1.5 text-black">
-                    Competitive Programming &amp; Achievements
+                    Achievements &amp; Honors
                   </h2>
                   <ul className="list-disc ml-4 space-y-1 text-xs text-black/90 leading-snug">
                     {resumeData.achievements.map((item, aIdx) => (
@@ -362,6 +362,20 @@ export function JakeResumeModal({ isOpen, onClose, profile }) {
                     ))}
                   </ul>
                 </div>
+
+                {/* 6. Co-curricular & Extracurricular Activities */}
+                {resumeData.extracurriculars && resumeData.extracurriculars.length > 0 && (
+                  <div className="mt-3">
+                    <h2 className="text-xs sm:text-sm font-bold uppercase tracking-widest border-b border-black pb-0.5 mb-1.5 text-black">
+                      Co-curricular &amp; Extracurricular Activities
+                    </h2>
+                    <ul className="list-disc ml-4 space-y-1 text-xs text-black/90 leading-snug">
+                      {resumeData.extracurriculars.map((item, eIdx) => (
+                        <li key={eIdx}>{item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             </div>
           ) : (

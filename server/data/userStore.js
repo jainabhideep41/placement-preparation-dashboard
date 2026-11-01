@@ -128,8 +128,20 @@ export function saveOrMergeUser(userData) {
         cgpa: (isExplicit ? userData.academic?.cgpa : null) ?? existing.academic?.cgpa ?? userData.academic?.cgpa ?? '8.85 / 10',
         desiredOption: (isExplicit ? userData.academic?.desiredOption : null) ?? existing.academic?.desiredOption ?? userData.academic?.desiredOption ?? (existing.targetRole || userData.targetRole || 'Software Development Engineer (SDE-1)'),
         dreamCompanies: (isExplicit ? userData.academic?.dreamCompanies : null) ?? existing.academic?.dreamCompanies ?? userData.academic?.dreamCompanies ?? 'Google, Microsoft, Uber, Atlassian',
-        workMode: (isExplicit ? userData.academic?.workMode : null) ?? existing.academic?.workMode ?? userData.academic?.workMode ?? 'Hybrid / Remote / On-site'
+        workMode: (isExplicit ? userData.academic?.workMode : null) ?? existing.academic?.workMode ?? userData.academic?.workMode ?? 'Hybrid / Remote / On-site',
+        achievements: (isExplicit && (userData.academic?.achievements !== undefined || userData.achievements !== undefined))
+          ? (userData.academic?.achievements ?? userData.achievements ?? [])
+          : (userData.academic?.achievements ?? userData.achievements ?? existing.academic?.achievements ?? existing.achievements ?? []),
+        extracurriculars: (isExplicit && (userData.academic?.extracurriculars !== undefined || userData.extracurriculars !== undefined))
+          ? (userData.academic?.extracurriculars ?? userData.extracurriculars ?? [])
+          : (userData.academic?.extracurriculars ?? userData.extracurriculars ?? existing.academic?.extracurriculars ?? existing.extracurriculars ?? [])
       },
+      achievements: (isExplicit && (userData.achievements !== undefined || userData.academic?.achievements !== undefined))
+        ? (userData.achievements ?? userData.academic?.achievements ?? [])
+        : (userData.achievements ?? userData.academic?.achievements ?? existing.achievements ?? existing.academic?.achievements ?? []),
+      extracurriculars: (isExplicit && (userData.extracurriculars !== undefined || userData.academic?.extracurriculars !== undefined))
+        ? (userData.extracurriculars ?? userData.academic?.extracurriculars ?? [])
+        : (userData.extracurriculars ?? userData.academic?.extracurriculars ?? existing.extracurriculars ?? existing.academic?.extracurriculars ?? []),
       providers: updatedProviders,
       provider: userData.provider || existing.provider,
       password: userData.password || existing.password || null,
@@ -178,8 +190,12 @@ export function saveOrMergeUser(userData) {
       cgpa: userData.academic?.cgpa || '8.85 / 10',
       desiredOption: userData.academic?.desiredOption || (userData.targetRole || 'Software Development Engineer (SDE-1)'),
       dreamCompanies: userData.academic?.dreamCompanies || 'Google, Microsoft, Uber, Atlassian',
-      workMode: userData.academic?.workMode || 'Hybrid / Remote / On-site'
+      workMode: userData.academic?.workMode || 'Hybrid / Remote / On-site',
+      achievements: userData.academic?.achievements || userData.achievements || [],
+      extracurriculars: userData.academic?.extracurriculars || userData.extracurriculars || []
     },
+    achievements: userData.achievements || userData.academic?.achievements || [],
+    extracurriculars: userData.extracurriculars || userData.academic?.extracurriculars || [],
     providers: [userData.provider || 'email'],
     provider: userData.provider || 'email',
     handles: {
@@ -244,6 +260,40 @@ export function updateUserProfile(email, profileData = {}) {
       ...user.academic,
       ...profileData.academic
     };
+    if (profileData.academic.achievements !== undefined) {
+      user.achievements = Array.isArray(profileData.academic.achievements)
+        ? profileData.academic.achievements
+        : (typeof profileData.academic.achievements === 'string'
+          ? profileData.academic.achievements.split('\n').map(s => s.trim().replace(/^[-*•]\s*/, '')).filter(Boolean)
+          : []);
+      user.academic.achievements = user.achievements;
+    }
+    if (profileData.academic.extracurriculars !== undefined) {
+      user.extracurriculars = Array.isArray(profileData.academic.extracurriculars)
+        ? profileData.academic.extracurriculars
+        : (typeof profileData.academic.extracurriculars === 'string'
+          ? profileData.academic.extracurriculars.split('\n').map(s => s.trim().replace(/^[-*•]\s*/, '')).filter(Boolean)
+          : []);
+      user.academic.extracurriculars = user.extracurriculars;
+    }
+  }
+  if (profileData.achievements !== undefined) {
+    user.achievements = Array.isArray(profileData.achievements)
+      ? profileData.achievements
+      : (typeof profileData.achievements === 'string'
+        ? profileData.achievements.split('\n').map(s => s.trim().replace(/^[-*•]\s*/, '')).filter(Boolean)
+        : []);
+    if (!user.academic) user.academic = {};
+    user.academic.achievements = user.achievements;
+  }
+  if (profileData.extracurriculars !== undefined) {
+    user.extracurriculars = Array.isArray(profileData.extracurriculars)
+      ? profileData.extracurriculars
+      : (typeof profileData.extracurriculars === 'string'
+        ? profileData.extracurriculars.split('\n').map(s => s.trim().replace(/^[-*•]\s*/, '')).filter(Boolean)
+        : []);
+    if (!user.academic) user.academic = {};
+    user.academic.extracurriculars = user.extracurriculars;
   }
   user.updatedAt = new Date().toISOString();
 

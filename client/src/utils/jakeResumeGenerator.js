@@ -115,7 +115,7 @@ export function getResumeStructuredData(profile, options = {}) {
     coreConcepts: 'Data Structures & Algorithms, High-Level System Design (HLD), Low-Level Design (LLD), Microservices, Concurrency'
   };
 
-  // Competitive Programming & Achievements
+  // Competitive Programming, Achievements & Honors
   const totalSolves = dsa.totalSolves || 342;
   const lcSolves = lc.problemsSolved || 285;
   const lcRating = lc.contestRating || 1740;
@@ -126,12 +126,30 @@ export function getResumeStructuredData(profile, options = {}) {
   const ghPRs = gh.pullRequests || 24;
   const ghStars = gh.totalStars || 48;
 
-  const achievements = [
+  const parseBulletList = (val) => {
+    if (!val) return [];
+    if (Array.isArray(val)) return val.map(s => String(s).trim().replace(/^[-*•]\s*/, '')).filter(Boolean);
+    if (typeof val === 'string') return val.split('\n').map(s => s.trim().replace(/^[-*•]\s*/, '')).filter(Boolean);
+    return [];
+  };
+
+  const customAchievements = parseBulletList(profile.achievements || profile.academic?.achievements);
+  const defaultAchievements = [
     `LeetCode: Solved ${lcSolves}+ algorithmic problems with contest rating of ${lcRating} (${lcRank} global); completed Striver's SDE Sheet & Blind 75.`,
     codeforcesHandle ? `Codeforces: Rated ${cfRating} (${cfRank}) under handle @${codeforcesHandle}; active participant in rated Division 2/3 rounds.` : `Codeforces: Rated ${cfRating} (${cfRank}); consistently active across division contests.`,
     `Open Source: Authored ${ghCommits}+ commits and ${ghPRs} pull requests with ${ghStars}+ stars across distributed systems & web dev repositories.`,
     `System Design & HLD: Verified mastery in distributed caching (Redis), horizontal scaling, rate limiting algorithms, and database sharding.`
   ];
+  const achievements = customAchievements.length > 0 ? customAchievements : defaultAchievements;
+
+  // Co-curricular & Extracurricular Activities
+  const customExtracurriculars = parseBulletList(profile.extracurriculars || profile.academic?.extracurriculars);
+  const defaultExtracurriculars = [
+    'Technical Club Lead: Organized college hackathons, technical symposiums, and mentored junior engineering peers in DSA.',
+    'Hackathon Finalist: Secured top 5 placement among 150+ teams in National Level Smart India Hackathon internal round.',
+    'Competitive Programming Mentor: Led weekly problem-solving workshops and peer code reviews on data structures.'
+  ];
+  const extracurriculars = customExtracurriculars.length > 0 ? customExtracurriculars : defaultExtracurriculars;
 
   return {
     name,
@@ -150,6 +168,7 @@ export function getResumeStructuredData(profile, options = {}) {
     projects,
     technicalSkills,
     achievements,
+    extracurriculars,
     totalSolves
   };
 }
@@ -194,6 +213,9 @@ ${bulletsLatex}
   }).join('\n');
 
   const achievementsLatex = data.achievements.map(a => `    \\resumeItem{${escapeLatex(a)}}`).join('\n');
+  const extracurricularsLatex = (data.extracurriculars || []).length > 0
+    ? data.extracurriculars.map(e => `    \\resumeItem{${escapeLatex(e)}}`).join('\n')
+    : '';
 
   return `%-------------------------
 % Resume in Latex
@@ -310,11 +332,17 @@ ${bulletsLatex}
 ${projectsLatex}
   \\resumeSubHeadingListEnd
 
-%-----------COMPETITIVE PROGRAMMING & ACHIEVEMENTS-----------
-\\section{Competitive Programming \\& Achievements}
+%-----------ACHIEVEMENTS & HONORS-----------
+\\section{Achievements \\& Honors}
   \\resumeItemListStart
 ${achievementsLatex}
   \\resumeItemListEnd
+${extracurricularsLatex ? `
+%-----------CO-CURRICULAR & EXTRACURRICULAR ACTIVITIES-----------
+\\section{Co-curricular \\& Extracurricular Activities}
+  \\resumeItemListStart
+${extracurricularsLatex}
+  \\resumeItemListEnd` : ''}
 
 \\end{document}
 `;

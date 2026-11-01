@@ -102,6 +102,8 @@ router.get('/:identifier', async (req, res) => {
         dreamCompanies: 'Google, Microsoft, Uber, Atlassian',
         workMode: 'Hybrid / Remote / On-site'
       },
+      achievements: matchedUser?.achievements || matchedUser?.academic?.achievements || [],
+      extracurriculars: matchedUser?.extracurriculars || matchedUser?.academic?.extracurriculars || [],
       bio: ghStats?.profile?.bio || `Aspiring ${targetRole} with verified competency across Data Structures, Algorithms, Distributed Systems, and Full-Stack Engineering.`,
       location: ghStats?.profile?.location || 'India',
       handles: {

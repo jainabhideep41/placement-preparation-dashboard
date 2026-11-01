@@ -29,7 +29,9 @@ import {
   FileText,
   Mail,
   Phone,
-  EyeOff
+  EyeOff,
+  Trophy,
+  Users
 } from 'lucide-react';
 import { findUserByIdentifier } from '../utils/accountManager';
 import { JakeResumeModal } from '../components/profile/JakeResumeModal';
@@ -291,6 +293,29 @@ export function PublicProfile({ currentUser }) {
     (currentUser.handles?.leetcode && currentUser.handles.leetcode.toLowerCase() === profile?.handles?.leetcode?.toLowerCase()) ||
     (currentUser.handles?.github && currentUser.handles.github.toLowerCase() === profile?.handles?.github?.toLowerCase())
   ));
+
+  const parseBulletList = (val) => {
+    if (!val) return [];
+    if (Array.isArray(val)) return val.map(s => String(s).trim().replace(/^[-*•]\s*/, '')).filter(Boolean);
+    if (typeof val === 'string') return val.split('\n').map(s => s.trim().replace(/^[-*•]\s*/, '')).filter(Boolean);
+    return [];
+  };
+
+  const candidateAchievements = parseBulletList(
+    (profile?.achievements && profile.achievements.length > 0)
+      ? profile.achievements
+      : (profile?.academic?.achievements && profile.academic.achievements.length > 0)
+        ? profile.academic.achievements
+        : (isSelf ? (currentUser?.achievements || currentUser?.academic?.achievements) : null)
+  );
+
+  const candidateExtracurriculars = parseBulletList(
+    (profile?.extracurriculars && profile.extracurriculars.length > 0)
+      ? profile.extracurriculars
+      : (profile?.academic?.extracurriculars && profile.academic.extracurriculars.length > 0)
+        ? profile.academic.extracurriculars
+        : (isSelf ? (currentUser?.extracurriculars || currentUser?.academic?.extracurriculars) : null)
+  );
 
   return (
     <div className="min-h-screen bg-[#EFEFEF] text-black font-sans selection:bg-black selection:text-white pb-16 print:bg-white print:p-0">
@@ -700,6 +725,135 @@ export function PublicProfile({ currentUser }) {
               </div>
             </div>
           </section>
+        )}
+
+        {/* Achievements & Honors and Co-curricular & Extracurricular Dossier Sections */}
+        {(candidateAchievements.length > 0 || candidateExtracurriculars.length > 0 || isSelf) && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            {/* Achievements & Honors Card */}
+            <section className="bg-white border-2 border-black rounded-xl p-5 sm:p-6 shadow-[4px_4px_0px_0px_#000] flex flex-col justify-between space-y-4">
+              <div>
+                <div className="flex items-center justify-between pb-3 border-b-2 border-black/10">
+                  <div className="flex items-center gap-2">
+                    <Trophy className="w-5 h-5 text-amber-500" />
+                    <h2 className="text-base sm:text-lg font-black tracking-tight">Achievements &amp; Honors</h2>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-xs font-bold px-2 py-0.5 bg-amber-100 text-amber-900 border border-amber-500 rounded">
+                      {candidateAchievements.length} Recognized
+                    </span>
+                    {isSelf && (
+                      <Link
+                        to="/settings"
+                        className="font-mono text-xs font-bold px-2 py-0.5 bg-black text-white hover:bg-neutral-800 rounded border border-black inline-flex items-center gap-1 transition-colors"
+                        title="Edit Achievements in Settings"
+                      >
+                        <Edit3 className="w-3 h-3" />
+                        <span>Edit</span>
+                      </Link>
+                    )}
+                  </div>
+                </div>
+
+                <div className="pt-3">
+                  {candidateAchievements.length > 0 ? (
+                    <ul className="space-y-2 text-xs text-neutral-800 leading-relaxed font-sans">
+                      {candidateAchievements.map((item, idx) => (
+                        <li key={idx} className="flex items-start gap-2.5 p-2.5 rounded-lg bg-[#F9F9F7] border border-black/15">
+                          <span className="w-5 h-5 rounded-full bg-amber-500/10 text-amber-600 border border-amber-400 font-mono text-[10px] font-black flex items-center justify-center shrink-0 mt-0.5">
+                            {idx + 1}
+                          </span>
+                          <span className="font-medium text-black">{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="p-4 rounded-xl border border-dashed border-black/20 bg-neutral-50 text-center space-y-2">
+                      <p className="text-xs text-black/60 font-mono">
+                        No custom achievements added yet. PrepStack will automatically synthesize verified CP solve stats and open-source milestones for your ATS resume.
+                      </p>
+                      {isSelf && (
+                        <Link
+                          to="/settings"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-black text-white rounded-lg font-mono text-xs font-bold hover:bg-neutral-800 transition-colors shadow-xs"
+                        >
+                          <Trophy className="w-3.5 h-3.5 text-amber-400" />
+                          <span>+ Add Achievements in Settings</span>
+                        </Link>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-black/10 flex items-center justify-between text-[11px] font-mono text-black/50">
+                <span>ATS Resume: Section 5</span>
+                <span className="text-emerald-700 font-semibold">✓ Synchronized with LaTeX Overleaf Export</span>
+              </div>
+            </section>
+
+            {/* Co-curricular & Extracurricular Activities Card */}
+            <section className="bg-white border-2 border-black rounded-xl p-5 sm:p-6 shadow-[4px_4px_0px_0px_#000] flex flex-col justify-between space-y-4">
+              <div>
+                <div className="flex items-center justify-between pb-3 border-b-2 border-black/10">
+                  <div className="flex items-center gap-2">
+                    <Users className="w-5 h-5 text-blue-600" />
+                    <h2 className="text-base sm:text-lg font-black tracking-tight">Co-curricular &amp; Extracurricular</h2>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-xs font-bold px-2 py-0.5 bg-blue-100 text-blue-900 border border-blue-500 rounded">
+                      {candidateExtracurriculars.length} Activities
+                    </span>
+                    {isSelf && (
+                      <Link
+                        to="/settings"
+                        className="font-mono text-xs font-bold px-2 py-0.5 bg-black text-white hover:bg-neutral-800 rounded border border-black inline-flex items-center gap-1 transition-colors"
+                        title="Edit Extracurriculars in Settings"
+                      >
+                        <Edit3 className="w-3 h-3" />
+                        <span>Edit</span>
+                      </Link>
+                    )}
+                  </div>
+                </div>
+
+                <div className="pt-3">
+                  {candidateExtracurriculars.length > 0 ? (
+                    <ul className="space-y-2 text-xs text-neutral-800 leading-relaxed font-sans">
+                      {candidateExtracurriculars.map((item, idx) => (
+                        <li key={idx} className="flex items-start gap-2.5 p-2.5 rounded-lg bg-[#F9F9F7] border border-black/15">
+                          <span className="w-5 h-5 rounded-full bg-blue-500/10 text-blue-600 border border-blue-400 font-mono text-[10px] font-black flex items-center justify-center shrink-0 mt-0.5">
+                            {idx + 1}
+                          </span>
+                          <span className="font-medium text-black">{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="p-4 rounded-xl border border-dashed border-black/20 bg-neutral-50 text-center space-y-2">
+                      <p className="text-xs text-black/60 font-mono">
+                        No co-curricular or extracurricular activities listed yet. Add technical clubs, hackathon organization, or peer mentoring to highlight well-rounded leadership.
+                      </p>
+                      {isSelf && (
+                        <Link
+                          to="/settings"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-black text-white rounded-lg font-mono text-xs font-bold hover:bg-neutral-800 transition-colors shadow-xs"
+                        >
+                          <Users className="w-3.5 h-3.5 text-blue-400" />
+                          <span>+ Add Activities in Settings</span>
+                        </Link>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-black/10 flex items-center justify-between text-[11px] font-mono text-black/50">
+                <span>ATS Resume: Section 6</span>
+                <span className="text-emerald-700 font-semibold">✓ Synchronized with LaTeX Overleaf Export</span>
+              </div>
+            </section>
+          </div>
         )}
 
         {/* 5-Pillar Competency Radar / Overview Cards */}
@@ -1158,7 +1312,9 @@ export function PublicProfile({ currentUser }) {
           ...profile,
           phone: profile.phone || (isSelf ? (currentUser?.phone || currentUser?.academic?.phone) : null),
           email: profile.email || (isSelf ? currentUser?.email : null),
-          privacy: profile.privacy || (isSelf ? currentUser?.privacy : null)
+          privacy: profile.privacy || (isSelf ? currentUser?.privacy : null),
+          achievements: (candidateAchievements.length > 0) ? candidateAchievements : (profile.achievements || []),
+          extracurriculars: (candidateExtracurriculars.length > 0) ? candidateExtracurriculars : (profile.extracurriculars || [])
         } : null} 
       />
     </div>

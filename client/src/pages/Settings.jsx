@@ -28,7 +28,8 @@ import {
   Mail,
   Eye,
   EyeOff,
-  Shield
+  Shield,
+  Users
 } from 'lucide-react';
 import { useLocalCache } from '../hooks/useLocalCache';
 import { saveUserToRegistry } from '../utils/accountManager';
@@ -78,6 +79,18 @@ export function Settings({ onRefreshAll }) {
     currentUser?.privacy?.showPhone !== undefined ? Boolean(currentUser.privacy.showPhone) : false
   );
 
+  // Resume Sections: Achievements & Extracurriculars
+  const [achievementsInput, setAchievementsInput] = useState(() => {
+    const ach = currentUser?.achievements || currentUser?.academic?.achievements;
+    if (Array.isArray(ach)) return ach.join('\n');
+    return ach || '';
+  });
+  const [extracurricularsInput, setExtracurricularsInput] = useState(() => {
+    const extra = currentUser?.extracurriculars || currentUser?.academic?.extracurriculars;
+    if (Array.isArray(extra)) return extra.join('\n');
+    return extra || '';
+  });
+
   const [academicSavedSuccess, setAcademicSavedSuccess] = useState(false);
   const [academicError, setAcademicError] = useState('');
 
@@ -121,6 +134,14 @@ export function Settings({ onRefreshAll }) {
       if (currentUser.academic.cgpa) setCgpaInput(currentUser.academic.cgpa);
       if (currentUser.academic.dreamCompanies) setDreamCompaniesInput(currentUser.academic.dreamCompanies);
       if (currentUser.academic.workMode) setWorkModeInput(currentUser.academic.workMode);
+    }
+    const ach = currentUser?.achievements || currentUser?.academic?.achievements;
+    if (ach !== undefined) {
+      setAchievementsInput(Array.isArray(ach) ? ach.join('\n') : (ach || ''));
+    }
+    const extra = currentUser?.extracurriculars || currentUser?.academic?.extracurriculars;
+    if (extra !== undefined) {
+      setExtracurricularsInput(Array.isArray(extra) ? extra.join('\n') : (extra || ''));
     }
   }, [currentUser]);
 
@@ -166,6 +187,16 @@ export function Settings({ onRefreshAll }) {
       showPhone: Boolean(showPhonePublicly)
     };
 
+    const achievementsList = achievementsInput
+      .split('\n')
+      .map(s => s.trim().replace(/^[-*•]\s*/, ''))
+      .filter(Boolean);
+
+    const extracurricularsList = extracurricularsInput
+      .split('\n')
+      .map(s => s.trim().replace(/^[-*•]\s*/, ''))
+      .filter(Boolean);
+
     const updatedAcademic = {
       college: collegeInput.trim(),
       degree: degreeInput.trim(),
@@ -174,7 +205,9 @@ export function Settings({ onRefreshAll }) {
       desiredOption: targetRoleInput,
       dreamCompanies: dreamCompaniesInput.trim(),
       workMode: workModeInput,
-      phone: phoneInput.trim()
+      phone: phoneInput.trim(),
+      achievements: achievementsList,
+      extracurriculars: extracurricularsList
     };
 
     // 1. Save locally in registry & prep_auth_user
@@ -194,7 +227,9 @@ export function Settings({ onRefreshAll }) {
         name: nameInput.trim() || currentUser.name,
         targetRole: targetRoleInput,
         handles: currentHandles,
-        academic: updatedAcademic
+        academic: updatedAcademic,
+        achievements: achievementsList,
+        extracurriculars: extracurricularsList
       }, true);
 
       // 2. Sync to backend API
@@ -210,7 +245,9 @@ export function Settings({ onRefreshAll }) {
             name: nameInput.trim() || currentUser.name,
             targetRole: targetRoleInput,
             handles: currentHandles,
-            academic: updatedAcademic
+            academic: updatedAcademic,
+            achievements: achievementsList,
+            extracurriculars: extracurricularsList
           })
         });
         const data = await res.json();
@@ -813,6 +850,84 @@ export function Settings({ onRefreshAll }) {
                 <option value="Hybrid">Hybrid</option>
                 <option value="On-site">On-site</option>
               </select>
+            </div>
+          </div>
+
+          {/* Resume Sections: Achievements & Honors and Co-curricular & Extracurricular Activities */}
+          <div className="pt-3 border-t-2 border-dashed border-black/15 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h3 className="text-sm font-extrabold text-black flex items-center gap-2">
+                  <Trophy className="w-4 h-4 text-amber-500" />
+                  <span>Resume Builder: Achievements &amp; Extracurriculars</span>
+                </h3>
+                <p className="text-[11px] text-black/60 mt-0.5">
+                  These headings populate your verified Public Dossier and Jake&apos;s ATS Resume template. Enter one bullet point per line.
+                </p>
+              </div>
+              <span className="font-mono text-[10px] font-bold px-2.5 py-1 rounded-lg bg-black text-white uppercase tracking-wider shrink-0 self-start sm:self-auto shadow-xs">
+                Overleaf ATS Compliant
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* Heading 1: Achievements & Honors */}
+              <div className="p-4 rounded-2xl bg-[#F9F9F7] border-2 border-black/15 space-y-2 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="font-bold text-black flex items-center gap-1.5 text-xs">
+                      <Trophy className="w-3.5 h-3.5 text-amber-500" />
+                      <span>Achievements &amp; Honors</span>
+                    </label>
+                    <span className="font-mono text-[10px] text-black/50 font-bold uppercase">
+                      One bullet per line
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-black/60 leading-relaxed mb-2">
+                    Highlight hackathon victories, scholarships, competitive programming ranks, or academic honors. If left empty, platform automatically inserts your verified LeetCode &amp; Codeforces metrics.
+                  </p>
+                  <textarea
+                    rows={4}
+                    value={achievementsInput}
+                    onChange={(e) => setAchievementsInput(e.target.value)}
+                    placeholder={`Winner at HackCBS 6.0 among 400+ national engineering teams\nSecured Global Rank 45 in LeetCode Weekly Contest 390\nRecipient of Academic Merit Scholarship (Top 1% of CS department)`}
+                    className="w-full px-3 py-2.5 rounded-xl bg-white border border-black/20 text-xs font-mono font-medium text-black focus:outline-none focus:border-black resize-y leading-relaxed"
+                  />
+                </div>
+                <div className="text-[10.5px] font-mono text-black/50 flex items-center justify-between pt-1">
+                  <span>{achievementsInput.split('\n').filter(s => s.trim()).length} bullet point(s)</span>
+                  <span className="text-emerald-700 font-bold">✓ Formatted as ATS \resumeItem</span>
+                </div>
+              </div>
+
+              {/* Heading 2: Co-curricular & Extracurricular Activities */}
+              <div className="p-4 rounded-2xl bg-[#F9F9F7] border-2 border-black/15 space-y-2 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="font-bold text-black flex items-center gap-1.5 text-xs">
+                      <Users className="w-3.5 h-3.5 text-blue-600" />
+                      <span>Co-curricular &amp; Extracurricular Activities</span>
+                    </label>
+                    <span className="font-mono text-[10px] text-black/50 font-bold uppercase">
+                      One bullet per line
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-black/60 leading-relaxed mb-2">
+                    Showcase engineering club leads, hackathon organizing committees, tech symposiums, mentoring juniors, or open-source community leadership to demonstrate proactive teamwork.
+                  </p>
+                  <textarea
+                    rows={4}
+                    value={extracurricularsInput}
+                    onChange={(e) => setExtracurricularsInput(e.target.value)}
+                    placeholder={`Lead Organizer of Annual National Hackathon with 800+ attendees\nStudent Mentor for Data Structures & Algorithms Club (mentored 80+ juniors)\nActive Core Contributor to open-source developer tooling`}
+                    className="w-full px-3 py-2.5 rounded-xl bg-white border border-black/20 text-xs font-mono font-medium text-black focus:outline-none focus:border-black resize-y leading-relaxed"
+                  />
+                </div>
+                <div className="text-[10.5px] font-mono text-black/50 flex items-center justify-between pt-1">
+                  <span>{extracurricularsInput.split('\n').filter(s => s.trim()).length} bullet point(s)</span>
+                  <span className="text-emerald-700 font-bold">✓ Formatted as ATS \resumeItem</span>
+                </div>
+              </div>
             </div>
           </div>
 
