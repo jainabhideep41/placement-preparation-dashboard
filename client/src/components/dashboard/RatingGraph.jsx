@@ -10,8 +10,10 @@ import {
   AlertCircle,
   RefreshCw,
   ArrowUpRight,
-  Shield
+  Shield,
+  Star
 } from 'lucide-react';
+import { useLocalCache } from '../../hooks/useLocalCache';
 
 const COMPARISON_COLORS = [
   { stroke: '#10B981', dot: 'bg-emerald-500', badge: 'bg-emerald-50 text-emerald-800 border-emerald-300', fill: '#10b981' }, // Mint / Emerald
@@ -20,11 +22,6 @@ const COMPARISON_COLORS = [
   { stroke: '#F59E0B', dot: 'bg-amber-500', badge: 'bg-amber-50 text-amber-800 border-amber-300', fill: '#f59e0b' },     // Amber / Gold
   { stroke: '#06B6D4', dot: 'bg-cyan-500', badge: 'bg-cyan-50 text-cyan-800 border-cyan-300', fill: '#06b6d4' }         // Cyan / Electric Teal
 ];
-
-const SUGGESTIONS = {
-  codeforces: ['tourist', 'Benq', 'Petr', 'jiangly', 'Um_nik'],
-  leetcode: ['neal_wu', 'lee215', 'awice', 'wisdompeak', 'hiepit']
-};
 
 export function RatingGraph({ codeforcesData, leetcodeData, userHandles = {} }) {
   const [activePlatform, setActivePlatform] = useState('codeforces'); // 'codeforces' | 'leetcode'
@@ -38,6 +35,14 @@ export function RatingGraph({ codeforcesData, leetcodeData, userHandles = {} }) 
   const [compareInput, setCompareInput] = useState('');
   const [compareLoading, setCompareLoading] = useState(false);
   const [compareError, setCompareError] = useState(null);
+
+  // User-Configurable Quick Suggestions (Max 5 Profiles, Persisted per Platform)
+  const [cfSuggestions, setCfSuggestions] = useLocalCache('prep_quick_suggestions_cf', []);
+  const [lcSuggestions, setLcSuggestions] = useLocalCache('prep_quick_suggestions_lc', []);
+  const [saveToSuggestions, setSaveToSuggestions] = useState(true);
+
+  const quickSuggestions = activePlatform === 'codeforces' ? (cfSuggestions || []) : (lcSuggestions || []);
+  const setQuickSuggestions = activePlatform === 'codeforces' ? setCfSuggestions : setLcSuggestions;
 
   const inputRef = useRef(null);
 
@@ -192,6 +197,19 @@ export function RatingGraph({ codeforcesData, leetcodeData, userHandles = {} }) 
       };
 
       setComparedUsers(prev => [...prev, newEntry]);
+
+      // If user checked "Save to Quick Suggestions" when typing a new handle
+      const resolvedHandle = d.username || raw;
+      if (saveToSuggestions && !candidateUsername) {
+        setQuickSuggestions(prev => {
+          const currentList = prev || [];
+          if (currentList.length < 5 && !currentList.some(s => s.toLowerCase() === resolvedHandle.toLowerCase())) {
+            return [...currentList, resolvedHandle];
+          }
+          return currentList;
+        });
+      }
+
       setCompareInput('');
     } catch (err) {
       setCompareError(err.message || `Unable to locate candidate @${raw}`);
@@ -208,6 +226,29 @@ export function RatingGraph({ codeforcesData, leetcodeData, userHandles = {} }) 
   const handleClearAll = () => {
     setComparedUsers([]);
     setCompareError(null);
+  };
+
+  // Toggle profile inside Quick Suggestions box (max 5)
+  const handleTogglePinSuggestion = (username) => {
+    if (!username) return;
+    const isPinned = quickSuggestions.some(s => s.toLowerCase() === username.toLowerCase());
+
+    if (isPinned) {
+      setQuickSuggestions(prev => (prev || []).filter(s => s.toLowerCase() !== username.toLowerCase()));
+      setCompareError(null);
+    } else {
+      if (quickSuggestions.length >= 5) {
+        setCompareError('Quick Suggestions box is full (5/5 max). Remove a profile with (×) to add another.');
+        return;
+      }
+      setQuickSuggestions(prev => [...(prev || []), username]);
+      setCompareError(null);
+    }
+  };
+
+  // Remove a profile from Quick Suggestions box
+  const handleRemoveSuggestion = (username) => {
+    setQuickSuggestions(prev => (prev || []).filter(s => s.toLowerCase() !== username.toLowerCase()));
   };
 
   // SVG Chart Dimensions
@@ -456,11 +497,11 @@ export function RatingGraph({ codeforcesData, leetcodeData, userHandles = {} }) 
                   Compare with up to 5 {activePlatform === 'codeforces' ? 'Codeforces' : 'LeetCode'} Usernames
                 </span>
                 <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-gray-200 text-gray-700 font-bold">
-                  Temporary
+                  Temporary Session
                 </span>
               </div>
               <p className="text-[11px] text-gray-500">
-                Session comparison only — not saved to your profile. Enter candidate handles to overlay their trajectories.
+                Session comparison only — not saved to profile. Check "Save to Quick Suggestions" to bookmark up to 5 handles.
               </p>
             </div>
 
@@ -471,7 +512,7 @@ export function RatingGraph({ codeforcesData, leetcodeData, userHandles = {} }) 
                 className="self-start sm:self-auto text-[11px] font-mono text-rose-600 hover:text-rose-700 font-bold flex items-center gap-1 hover:underline"
               >
                 <Trash2 className="w-3 h-3" />
-                <span>Clear All ({comparedUsers.length})</span>
+                <span>Clear Graph ({comparedUsers.length})</span>
               </button>
             )}
           </div>
@@ -482,55 +523,82 @@ export function RatingGraph({ codeforcesData, leetcodeData, userHandles = {} }) 
               e.preventDefault();
               handleAddComparison();
             }}
-            className="flex items-center gap-2"
+            className="space-y-2"
           >
-            <div className="relative flex-1">
-              <input
-                ref={inputRef}
-                type="text"
-                value={compareInput}
-                onChange={(e) => {
-                  setCompareInput(e.target.value);
-                  if (compareError) setCompareError(null);
-                }}
-                disabled={compareLoading || comparedUsers.length >= 5}
-                placeholder={
-                  comparedUsers.length >= 5
-                    ? "Maximum of 5 comparison handles reached"
-                    : activePlatform === 'codeforces'
-                      ? "Enter Codeforces handle (e.g. tourist, Benq, Petr)..."
-                      : "Enter LeetCode username (e.g. neal_wu, lee215)..."
-                }
-                className="w-full pl-3 pr-8 py-2 rounded-xl text-xs bg-white border border-gray-300 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent font-mono disabled:bg-gray-100 disabled:text-gray-400"
-              />
-              {compareInput && (
-                <button
-                  type="button"
-                  onClick={() => setCompareInput('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              )}
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={compareInput}
+                  onChange={(e) => {
+                    setCompareInput(e.target.value);
+                    if (compareError) setCompareError(null);
+                  }}
+                  disabled={compareLoading || comparedUsers.length >= 5}
+                  placeholder={
+                    comparedUsers.length >= 5
+                      ? "Maximum of 5 comparison handles reached on graph"
+                      : activePlatform === 'codeforces'
+                        ? "Enter Codeforces handle to compare..."
+                        : "Enter LeetCode username to compare..."
+                  }
+                  className="w-full pl-3 pr-8 py-2 rounded-xl text-xs bg-white border border-gray-300 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent font-mono disabled:bg-gray-100 disabled:text-gray-400 shadow-2xs"
+                />
+                {compareInput && (
+                  <button
+                    type="button"
+                    onClick={() => setCompareInput('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              <button
+                type="submit"
+                disabled={compareLoading || !compareInput.trim() || comparedUsers.length >= 5}
+                className="px-4 py-2 rounded-xl bg-black hover:bg-neutral-800 disabled:bg-gray-300 text-white font-mono text-xs font-bold transition-all flex items-center gap-1.5 flex-shrink-0 shadow-xs"
+              >
+                {compareLoading ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Fetching...</span>
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Compare ({comparedUsers.length}/5)</span>
+                  </>
+                )}
+              </button>
             </div>
 
-            <button
-              type="submit"
-              disabled={compareLoading || !compareInput.trim() || comparedUsers.length >= 5}
-              className="px-4 py-2 rounded-xl bg-black hover:bg-neutral-800 disabled:bg-gray-300 text-white font-mono text-xs font-bold transition-all flex items-center gap-1.5 flex-shrink-0"
-            >
-              {compareLoading ? (
-                <>
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                  <span>Fetching...</span>
-                </>
-              ) : (
-                <>
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Add ({comparedUsers.length}/5)</span>
-                </>
+            {/* Checkbox: Add to Quick Suggestions when comparing for the first time */}
+            <div className="flex items-center justify-between text-xs pt-0.5">
+              <label className="inline-flex items-center gap-2 cursor-pointer select-none text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={saveToSuggestions && quickSuggestions.length < 5}
+                  disabled={quickSuggestions.length >= 5}
+                  onChange={(e) => setSaveToSuggestions(e.target.checked)}
+                  className="w-3.5 h-3.5 rounded border-gray-300 text-black focus:ring-black accent-black cursor-pointer disabled:cursor-not-allowed"
+                />
+                <span className="text-[11px] font-medium flex items-center gap-1.5">
+                  <span>Add this profile to Quick Suggestions when comparing</span>
+                  <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-amber-50 text-amber-700 font-bold border border-amber-200">
+                    {quickSuggestions.length}/5 slots
+                  </span>
+                </span>
+              </label>
+
+              {quickSuggestions.length >= 5 && (
+                <span className="text-[10px] font-mono font-bold text-amber-600">
+                  Quick Suggestions Box Full (5/5)
+                </span>
               )}
-            </button>
+            </div>
           </form>
 
           {/* Inline Error Notice */}
@@ -541,38 +609,85 @@ export function RatingGraph({ codeforcesData, leetcodeData, userHandles = {} }) 
             </div>
           )}
 
-          {/* Quick Suggestions Pills */}
-          <div className="flex items-center gap-1.5 flex-wrap pt-1 border-t border-neutral-200/60">
-            <span className="text-[11px] text-gray-500 font-medium">Quick Suggestions:</span>
-            {SUGGESTIONS[activePlatform].map(suggested => {
-              const isAdded = comparedUsers.some(u => u.username.toLowerCase() === suggested.toLowerCase());
-              const isSelf = currentSelfHandle.toLowerCase() === suggested.toLowerCase();
-              return (
-                <button
-                  key={suggested}
-                  type="button"
-                  disabled={compareLoading || isAdded || isSelf || comparedUsers.length >= 5}
-                  onClick={() => handleAddComparison(suggested)}
-                  className={`text-[10px] font-mono px-2 py-0.5 rounded-md border transition-all ${
-                    isAdded
-                      ? 'bg-gray-200 text-gray-400 border-gray-300 cursor-not-allowed'
-                      : isSelf
-                        ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
-                        : 'bg-white hover:bg-black hover:text-white text-gray-700 border-gray-300 shadow-2xs'
-                  }`}
-                >
-                  +{suggested} {isAdded ? '✓' : ''}
-                </button>
-              );
-            })}
+          {/* Quick Suggestions Box (Up to 5 Usernames) */}
+          <div className="pt-2 border-t border-neutral-200/60 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                <span className="text-[11px] font-bold text-gray-800">
+                  Quick Suggestions ({quickSuggestions.length}/5 max):
+                </span>
+              </div>
+              {quickSuggestions.length >= 5 ? (
+                <span className="text-[10px] font-mono text-amber-700 font-bold px-1.5 py-0.5 rounded bg-amber-50 border border-amber-200">
+                  Max 5 Profiles Reached
+                </span>
+              ) : (
+                <span className="text-[10px] font-mono text-gray-400">
+                  {5 - quickSuggestions.length} {5 - quickSuggestions.length === 1 ? 'slot' : 'slots'} available
+                </span>
+              )}
+            </div>
+
+            {quickSuggestions.length === 0 ? (
+              <div className="py-2.5 px-3 rounded-xl bg-white border border-dashed border-gray-300 text-[11px] text-gray-500">
+                No quick suggestions saved yet. Enter a username above with <strong>"Add this profile to Quick Suggestions"</strong> checked to bookmark up to 5 profiles for 1-click comparison.
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {quickSuggestions.map(suggested => {
+                  const isAdded = comparedUsers.some(u => u.username.toLowerCase() === suggested.toLowerCase());
+                  const isSelf = currentSelfHandle.toLowerCase() === suggested.toLowerCase();
+
+                  return (
+                    <div
+                      key={suggested}
+                      className="inline-flex items-center rounded-lg border border-gray-300 bg-white shadow-2xs hover:border-black transition-all group overflow-hidden"
+                    >
+                      <button
+                        type="button"
+                        disabled={compareLoading || isAdded || isSelf || comparedUsers.length >= 5}
+                        onClick={() => handleAddComparison(suggested)}
+                        className={`text-[11px] font-mono pl-2.5 pr-2 py-1 transition-all flex items-center gap-1.5 ${
+                          isAdded
+                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                            : isSelf
+                              ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                              : 'hover:bg-black hover:text-white text-gray-800'
+                        }`}
+                        title={isAdded ? 'Already active in comparison graph' : `Add @${suggested} to graph`}
+                      >
+                        <span>+{suggested}</span>
+                        {isAdded && <span className="text-[10px] text-emerald-600 font-bold">✓</span>}
+                      </button>
+
+                      {/* Remove from Quick Suggestions Button */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRemoveSuggestion(suggested);
+                        }}
+                        title={`Remove @${suggested} from Quick Suggestions`}
+                        className="px-1.5 py-1 text-gray-400 hover:text-rose-600 hover:bg-rose-50 transition-colors border-l border-gray-200"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Active Compared User Badges */}
           {comparedUsers.length > 0 && (
-            <div className="flex items-center gap-2 flex-wrap pt-1">
-              <span className="text-[11px] font-bold text-gray-700">Active Comparison:</span>
+            <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-neutral-200/60">
+              <span className="text-[11px] font-bold text-gray-700">Active On Graph:</span>
               {comparedUsers.map((u) => {
                 const diff = u.rating - (selfCurrentRating || 1200);
+                const isPinned = quickSuggestions.some(s => s.toLowerCase() === u.username.toLowerCase());
+
                 return (
                   <div
                     key={u.id}
@@ -591,10 +706,31 @@ export function RatingGraph({ codeforcesData, leetcodeData, userHandles = {} }) 
                     >
                       {diff >= 0 ? `+${diff}` : diff}
                     </span>
+
+                    {/* Quick Pin / Unpin in Suggestions */}
+                    <button
+                      type="button"
+                      onClick={() => handleTogglePinSuggestion(u.username)}
+                      title={
+                        isPinned
+                          ? `Remove @${u.username} from Quick Suggestions`
+                          : quickSuggestions.length >= 5
+                            ? 'Quick suggestions full (5/5 max)'
+                            : `Add @${u.username} to Quick Suggestions`
+                      }
+                      className={`p-0.5 rounded transition-colors ${
+                        isPinned
+                          ? 'text-amber-500 hover:text-amber-600'
+                          : 'text-gray-300 hover:text-amber-500'
+                      }`}
+                    >
+                      <Star className={`w-3.5 h-3.5 ${isPinned ? 'fill-amber-500 text-amber-500' : ''}`} />
+                    </button>
+
                     <button
                       type="button"
                       onClick={() => handleRemoveUser(u.id)}
-                      title={`Remove @${u.username}`}
+                      title={`Remove @${u.username} from graph`}
                       className="p-0.5 rounded hover:bg-gray-100 text-gray-400 hover:text-rose-600 transition-colors"
                     >
                       <X className="w-3.5 h-3.5" />
@@ -906,7 +1042,7 @@ export function RatingGraph({ codeforcesData, leetcodeData, userHandles = {} }) 
                   <th className="py-2 px-3 font-semibold">Tier / Division</th>
                   <th className="py-2 px-3 font-semibold">Contests</th>
                   <th className="py-2 px-3 font-semibold">Gap vs You</th>
-                  <th className="py-2 px-3 font-semibold text-right">Action</th>
+                  <th className="py-2 px-3 font-semibold text-right">Quick Pin / Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 bg-white">
@@ -948,6 +1084,7 @@ export function RatingGraph({ codeforcesData, leetcodeData, userHandles = {} }) 
                   const profileUrl = isCf 
                     ? `https://codeforces.com/profile/${u.username}`
                     : `https://leetcode.com/${u.username}/`;
+                  const isPinned = quickSuggestions.some(s => s.toLowerCase() === u.username.toLowerCase());
 
                   return (
                     <tr key={u.id} className="hover:bg-gray-50/60 transition-colors">
@@ -990,14 +1127,37 @@ export function RatingGraph({ codeforcesData, leetcodeData, userHandles = {} }) 
                         </span>
                       </td>
                       <td className="py-2 px-3 text-right">
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveUser(u.id)}
-                          className="text-gray-400 hover:text-rose-600 p-1 rounded hover:bg-gray-100 transition-colors"
-                          title="Remove from comparison"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
+                        <div className="flex items-center justify-end gap-1">
+                          {/* Pin to Quick Suggestions */}
+                          <button
+                            type="button"
+                            onClick={() => handleTogglePinSuggestion(u.username)}
+                            title={
+                              isPinned
+                                ? 'Remove from Quick Suggestions'
+                                : quickSuggestions.length >= 5
+                                  ? 'Quick suggestions full (5/5 max)'
+                                  : 'Save to Quick Suggestions'
+                            }
+                            className={`p-1 rounded transition-colors ${
+                              isPinned
+                                ? 'text-amber-500 bg-amber-50 border border-amber-200'
+                                : 'text-gray-400 hover:text-amber-500 hover:bg-gray-100 border border-transparent'
+                            }`}
+                          >
+                            <Star className={`w-3.5 h-3.5 ${isPinned ? 'fill-amber-500 text-amber-500' : ''}`} />
+                          </button>
+
+                          {/* Remove from Graph */}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveUser(u.id)}
+                            className="text-gray-400 hover:text-rose-600 p-1 rounded hover:bg-gray-100 transition-colors"
+                            title="Remove from comparison graph"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
