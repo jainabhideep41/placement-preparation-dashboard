@@ -26,17 +26,26 @@ export function JakeResumeModal({ isOpen, onClose, profile }) {
   const [includePhone, setIncludePhone] = useState(
     Boolean(profile?.privacy?.showPhone)
   );
+  const [selectedProjectIds, setSelectedProjectIds] = useState(() => {
+    if (profile?.selectedResumeProjectIds && Array.isArray(profile.selectedResumeProjectIds) && profile.selectedResumeProjectIds.length > 0) {
+      return profile.selectedResumeProjectIds;
+    }
+    return ['proj_prepstack', 'proj_flashdrop'];
+  });
 
   React.useEffect(() => {
     if (profile) {
       setIncludeEmail(profile.privacy?.showEmail !== false);
       setIncludePhone(Boolean(profile.privacy?.showPhone));
+      if (profile.selectedResumeProjectIds && Array.isArray(profile.selectedResumeProjectIds) && profile.selectedResumeProjectIds.length > 0) {
+        setSelectedProjectIds(profile.selectedResumeProjectIds);
+      }
     }
   }, [profile]);
 
   if (!isOpen || !profile) return null;
 
-  const resumeOptions = { includeEmail, includePhone };
+  const resumeOptions = { includeEmail, includePhone, selectedResumeProjectIds: selectedProjectIds };
   const resumeData = getResumeStructuredData(profile, resumeOptions);
   const latexSource = generateJakeResumeLatex(profile, resumeOptions);
 
@@ -195,6 +204,47 @@ export function JakeResumeModal({ isOpen, onClose, profile }) {
                 </div>
               </div>
 
+              {/* Project Selection Pill Bar: Tick projects to feature in resume */}
+              {resumeData.allProjects && resumeData.allProjects.length > 0 && (
+                <div className="p-3 rounded-2xl bg-white border border-black/15 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs font-mono print:hidden shadow-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-black uppercase text-[10px] tracking-wider">
+                      Resume Projects ({selectedProjectIds.length} Ticked):
+                    </span>
+                    <span className="text-[11px] text-neutral-500">Tick which projects to feature in your 1-page ATS resume</span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {resumeData.allProjects.map((p) => {
+                      const isSelected = selectedProjectIds.includes(p.id);
+                      return (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedProjectIds((prev) => {
+                              if (prev.includes(p.id)) {
+                                if (prev.length === 1) return prev;
+                                return prev.filter((id) => id !== p.id);
+                              } else {
+                                return [...prev, p.id];
+                              }
+                            });
+                          }}
+                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
+                            isSelected
+                              ? 'bg-black text-white border-black shadow-xs'
+                              : 'bg-neutral-100 text-neutral-600 border-neutral-300 hover:bg-neutral-200'
+                          }`}
+                        >
+                          <span>{isSelected ? '✓' : '+'}</span>
+                          <span className="truncate max-w-[140px]">{p.title.split('—')[0].trim()}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {/* JAKE RESUME SHEET (Pixel-Perfect Overleaf Replica) */}
               <div 
                 id="jake-resume-print-area" 
@@ -274,48 +324,77 @@ export function JakeResumeModal({ isOpen, onClose, profile }) {
                   <h2 className="text-xs sm:text-sm font-bold uppercase tracking-widest border-b border-black pb-0.5 mb-1.5 text-black">
                     Education
                   </h2>
-                  <div className="text-xs">
-                    <div className="flex justify-between items-baseline font-bold text-black">
-                      <span>{resumeData.college}</span>
-                      <span className="font-normal italic text-[11px] text-black/80">{resumeData.location}</span>
+                  <div className="text-xs space-y-1.5">
+                    <div>
+                      <div className="flex justify-between items-baseline font-bold text-black">
+                        <span>{resumeData.college}</span>
+                        <span className="font-normal italic text-[11px] text-black/80">{resumeData.location}</span>
+                      </div>
+                      <div className="flex justify-between items-baseline italic text-black/90 text-[11px] mt-0.5">
+                        <span>{resumeData.degree} (CGPA: {resumeData.cgpa})</span>
+                        <span className="font-normal text-[11px] text-black/80">{resumeData.year}</span>
+                      </div>
                     </div>
-                    <div className="flex justify-between items-baseline italic text-black/90 text-[11px] mt-0.5">
-                      <span>{resumeData.degree} (CGPA: {resumeData.cgpa})</span>
-                      <span className="font-normal text-[11px] text-black/80">{resumeData.year}</span>
-                    </div>
+
+                    {/* Class 12th Senior Secondary */}
+                    {resumeData.class12 && (resumeData.class12.school || resumeData.class12.score) && (
+                      <div className="pt-1 border-t border-black/10">
+                        <div className="flex justify-between items-baseline font-bold text-black">
+                          <span>{resumeData.class12.school || 'Senior Secondary School'}</span>
+                          <span className="font-normal italic text-[11px] text-black/80">{resumeData.class12.board || 'CBSE'}</span>
+                        </div>
+                        <div className="flex justify-between items-baseline italic text-black/90 text-[11px] mt-0.5">
+                          <span>Class XII (Senior Secondary){resumeData.class12.score ? ` (Aggregate: ${resumeData.class12.score})` : ''}</span>
+                          <span className="font-normal text-[11px] text-black/80">{resumeData.class12.year || '2022'}</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Class 10th Secondary */}
+                    {resumeData.class10 && (resumeData.class10.school || resumeData.class10.score) && (
+                      <div className="pt-1 border-t border-black/10">
+                        <div className="flex justify-between items-baseline font-bold text-black">
+                          <span>{resumeData.class10.school || 'Secondary School'}</span>
+                          <span className="font-normal italic text-[11px] text-black/80">{resumeData.class10.board || 'CBSE'}</span>
+                        </div>
+                        <div className="flex justify-between items-baseline italic text-black/90 text-[11px] mt-0.5">
+                          <span>Class X (Secondary){resumeData.class10.score ? ` (Aggregate: ${resumeData.class10.score})` : ''}</span>
+                          <span className="font-normal text-[11px] text-black/80">{resumeData.class10.year || '2020'}</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                {/* 3. Technical Skills Section */}
-                <div className="mt-3">
-                  <h2 className="text-xs sm:text-sm font-bold uppercase tracking-widest border-b border-black pb-0.5 mb-1.5 text-black">
-                    Technical Skills
-                  </h2>
-                  <div className="text-xs space-y-1 text-black/90 leading-tight">
-                    <div>
-                      <strong className="text-black">Languages: </strong>
-                      <span>{resumeData.technicalSkills.languages}</span>
-                    </div>
-                    <div>
-                      <strong className="text-black">Frameworks &amp; Libraries: </strong>
-                      <span>{resumeData.technicalSkills.frameworks}</span>
-                    </div>
-                    <div>
-                      <strong className="text-black">Databases &amp; Caching: </strong>
-                      <span>{resumeData.technicalSkills.databases}</span>
-                    </div>
-                    <div>
-                      <strong className="text-black">Cloud &amp; Developer Tools: </strong>
-                      <span>{resumeData.technicalSkills.developerTools}</span>
-                    </div>
-                    <div>
-                      <strong className="text-black">Core Competencies: </strong>
-                      <span>{resumeData.technicalSkills.coreConcepts}</span>
+                {/* Experience Section (Internships & Work Experience) */}
+                {resumeData.experience && resumeData.experience.length > 0 && (
+                  <div className="mt-3">
+                    <h2 className="text-xs sm:text-sm font-bold uppercase tracking-widest border-b border-black pb-0.5 mb-1.5 text-black">
+                      Experience
+                    </h2>
+                    <div className="space-y-2 text-xs">
+                      {resumeData.experience.map((exp, eIdx) => (
+                        <div key={eIdx}>
+                          <div className="flex justify-between items-baseline font-bold text-black">
+                            <span>{exp.role}</span>
+                            <span className="font-normal italic text-[11px] text-black/80">{exp.duration}</span>
+                          </div>
+                          <div className="flex justify-between items-baseline italic text-black/90 text-[11px] mt-0.5">
+                            <span className="font-semibold">{exp.company}</span>
+                            <span className="font-normal text-black/80">{exp.location}</span>
+                          </div>
+                          <ul className="list-disc ml-4 mt-1 space-y-0.5 text-[11.5px] text-black/90 leading-snug">
+                            {exp.bullets.map((bullet, bIdx) => (
+                              <li key={bIdx}>{bullet}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                </div>
+                )}
 
-                {/* 4. Projects Section */}
+                {/* 3. Projects Section */}
                 <div className="mt-3">
                   <h2 className="text-xs sm:text-sm font-bold uppercase tracking-widest border-b border-black pb-0.5 mb-1.5 text-black">
                     Projects
@@ -348,6 +427,35 @@ export function JakeResumeModal({ isOpen, onClose, profile }) {
                         </ul>
                       </div>
                     ))}
+                  </div>
+                </div>
+
+                {/* 4. Technical Skills Section */}
+                <div className="mt-3">
+                  <h2 className="text-xs sm:text-sm font-bold uppercase tracking-widest border-b border-black pb-0.5 mb-1.5 text-black">
+                    Technical Skills
+                  </h2>
+                  <div className="text-xs space-y-1 text-black/90 leading-tight">
+                    <div>
+                      <strong className="text-black">Languages: </strong>
+                      <span>{resumeData.technicalSkills.languages}</span>
+                    </div>
+                    <div>
+                      <strong className="text-black">Frameworks &amp; Libraries: </strong>
+                      <span>{resumeData.technicalSkills.frameworks}</span>
+                    </div>
+                    <div>
+                      <strong className="text-black">Databases &amp; Caching: </strong>
+                      <span>{resumeData.technicalSkills.databases}</span>
+                    </div>
+                    <div>
+                      <strong className="text-black">Cloud &amp; Developer Tools: </strong>
+                      <span>{resumeData.technicalSkills.developerTools}</span>
+                    </div>
+                    <div>
+                      <strong className="text-black">Core Competencies: </strong>
+                      <span>{resumeData.technicalSkills.coreConcepts}</span>
+                    </div>
                   </div>
                 </div>
 

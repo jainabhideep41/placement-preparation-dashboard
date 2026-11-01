@@ -116,6 +116,16 @@ export function PublicProfile({ currentUser }) {
             },
             targetRole: localUser?.targetRole || data.profile.targetRole,
             academic: localUser?.academic ? { ...data.profile.academic, ...localUser.academic } : data.profile.academic,
+            class12: localUser?.class12 || localUser?.academic?.class12 || data.profile.class12 || data.profile.academic?.class12 || null,
+            class10: localUser?.class10 || localUser?.academic?.class10 || data.profile.class10 || data.profile.academic?.class10 || null,
+            experience: (Array.isArray(localUser?.experience) && localUser.experience.length > 0)
+              ? localUser.experience
+              : (data.profile.experience || []),
+            technicalSkills: localUser?.technicalSkills || data.profile.technicalSkills || null,
+            projects: (Array.isArray(localUser?.projects) && localUser.projects.length > 0)
+              ? localUser.projects
+              : (data.profile.projects || []),
+            selectedResumeProjectIds: localUser?.selectedResumeProjectIds || data.profile.selectedResumeProjectIds || ['proj_prepstack', 'proj_flashdrop'],
             handles: {
               leetcode: localHandles?.leetcode || data.profile.handles?.leetcode || '',
               codeforces: localHandles?.codeforces || data.profile.handles?.codeforces || '',
@@ -146,6 +156,11 @@ export function PublicProfile({ currentUser }) {
           avatarUrl: localUser?.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(localUser?.name || resolvedIdentifier)}&background=111&color=fff`,
           bio: 'Aspiring Software Engineer with verified competence across Data Structures, Algorithms, Distributed Systems, and Full-Stack Engineering.',
           location: 'India',
+          class12: localUser?.class12 || localUser?.academic?.class12 || null,
+          class10: localUser?.class10 || localUser?.academic?.class10 || null,
+          experience: (Array.isArray(localUser?.experience) && localUser.experience.length > 0) ? localUser.experience : [],
+          technicalSkills: localUser?.technicalSkills || null,
+          selectedResumeProjectIds: localUser?.selectedResumeProjectIds || ['proj_prepstack', 'proj_flashdrop'],
           handles: {
             leetcode: localHandles?.leetcode || '',
             codeforces: localHandles?.codeforces || '',
@@ -205,7 +220,7 @@ export function PublicProfile({ currentUser }) {
             mergedPullRequests: 19,
             totalStars: 48
           },
-          projects: [
+          projects: (Array.isArray(localUser?.projects) && localUser.projects.length > 0) ? localUser.projects : [
             {
               id: 'proj_prepstack',
               title: 'PrepStack — Placement Readiness & Developer Portfolio Engine',
@@ -724,6 +739,51 @@ export function PublicProfile({ currentUser }) {
                 </span>
               </div>
             </div>
+
+            {/* Secondary & Higher Secondary Education (10th & 12th) Badges */}
+            {((profile.class12 || profile.academic?.class12) || (profile.class10 || profile.academic?.class10)) && (
+              <div className="pt-3 border-t border-black/10 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {(profile.class12 || profile.academic?.class12) && (() => {
+                  const c12 = profile.class12 || profile.academic?.class12;
+                  return (
+                    <div className="p-3 bg-[#F9F9F7] border border-black/20 rounded-lg flex items-start gap-2.5">
+                      <div className="p-1.5 rounded-md bg-emerald-100 text-emerald-800 border border-emerald-300 shrink-0 mt-0.5">
+                        <GraduationCap className="w-3.5 h-3.5" />
+                      </div>
+                      <div className="space-y-0.5 min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-bold text-xs text-black">Class XII (Senior Secondary)</span>
+                          {c12.board && <span className="font-mono text-[10px] px-1.5 py-0.2 bg-white border border-black/20 rounded font-semibold">{c12.board}</span>}
+                          {c12.year && <span className="font-mono text-[10px] text-neutral-500 font-semibold">{c12.year}</span>}
+                        </div>
+                        <p className="text-[11px] text-neutral-700 truncate font-medium">{c12.school || 'Senior Secondary School'}</p>
+                        {c12.score && <p className="font-mono text-[11px] font-bold text-emerald-800">Aggregate: {c12.score}</p>}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {(profile.class10 || profile.academic?.class10) && (() => {
+                  const c10 = profile.class10 || profile.academic?.class10;
+                  return (
+                    <div className="p-3 bg-[#F9F9F7] border border-black/20 rounded-lg flex items-start gap-2.5">
+                      <div className="p-1.5 rounded-md bg-blue-100 text-blue-800 border border-blue-300 shrink-0 mt-0.5">
+                        <GraduationCap className="w-3.5 h-3.5" />
+                      </div>
+                      <div className="space-y-0.5 min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-bold text-xs text-black">Class X (Secondary School)</span>
+                          {c10.board && <span className="font-mono text-[10px] px-1.5 py-0.2 bg-white border border-black/20 rounded font-semibold">{c10.board}</span>}
+                          {c10.year && <span className="font-mono text-[10px] text-neutral-500 font-semibold">{c10.year}</span>}
+                        </div>
+                        <p className="text-[11px] text-neutral-700 truncate font-medium">{c10.school || 'Secondary School'}</p>
+                        {c10.score && <p className="font-mono text-[11px] font-bold text-blue-800">Aggregate: {c10.score}</p>}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
           </section>
         )}
 
@@ -854,6 +914,82 @@ export function PublicProfile({ currentUser }) {
               </div>
             </section>
           </div>
+        )}
+
+        {/* Work Experience & Internships Section */}
+        {((Array.isArray(profile.experience) && profile.experience.length > 0) || isSelf) && (
+          <section className="bg-white border-2 border-black rounded-xl p-5 sm:p-6 shadow-[4px_4px_0px_0px_#000] space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b-2 border-black/10">
+              <div className="flex items-center gap-2">
+                <Briefcase className="w-5 h-5 text-black" />
+                <h2 className="text-base sm:text-lg font-black tracking-tight">Work Experience &amp; Internships</h2>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-xs font-bold px-2 py-0.5 bg-blue-100 text-blue-900 border border-blue-400 rounded">
+                  {(profile.experience || []).length} Roles
+                </span>
+                {isSelf && (
+                  <Link
+                    to="/settings"
+                    className="font-mono text-xs font-bold px-2 py-0.5 bg-black text-white hover:bg-neutral-800 rounded border border-black inline-flex items-center gap-1 transition-colors"
+                    title="Manage Work Experience in Settings"
+                  >
+                    <Edit3 className="w-3 h-3" />
+                    <span>Manage</span>
+                  </Link>
+                )}
+              </div>
+            </div>
+
+            {(profile.experience && profile.experience.length > 0) ? (
+              <div className="space-y-4">
+                {profile.experience.map((exp, idx) => {
+                  const bulletsList = Array.isArray(exp.bullets)
+                    ? exp.bullets
+                    : (typeof exp.bullets === 'string' ? exp.bullets.split('\n').filter(Boolean) : []);
+                  return (
+                    <div key={exp.id || idx} className="p-4 rounded-xl bg-[#F9F9F7] border border-black/15 space-y-2">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-b border-black/10 pb-2">
+                        <div>
+                          <h3 className="font-black text-sm text-black">{exp.role}</h3>
+                          <span className="font-mono text-xs font-bold text-neutral-700">{exp.company}</span>
+                        </div>
+                        <div className="text-left sm:text-right font-mono text-[11px] text-neutral-600">
+                          <span className="font-bold text-black">{exp.duration}</span>
+                          {exp.location && <span className="block text-[10px] text-neutral-500">{exp.location}</span>}
+                        </div>
+                      </div>
+                      {bulletsList.length > 0 && (
+                        <ul className="space-y-1.5 pt-1 text-xs text-neutral-800">
+                          {bulletsList.map((b, bIdx) => (
+                            <li key={bIdx} className="flex items-start gap-2">
+                              <span className="w-1.5 h-1.5 rounded-full bg-black shrink-0 mt-1.5" />
+                              <span className="leading-relaxed">{b}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="p-4 rounded-xl border border-dashed border-black/20 bg-neutral-50 text-center space-y-2">
+                <p className="text-xs text-black/60 font-mono">
+                  No work experience or internships listed yet. Add industrial roles or freelance projects to showcase professional track record.
+                </p>
+                {isSelf && (
+                  <Link
+                    to="/settings"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-black text-white rounded-lg font-mono text-xs font-bold hover:bg-neutral-800 transition-colors shadow-xs"
+                  >
+                    <Briefcase className="w-3.5 h-3.5 text-blue-400" />
+                    <span>+ Add Experience in Settings</span>
+                  </Link>
+                )}
+              </div>
+            )}
+          </section>
         )}
 
         {/* 5-Pillar Competency Radar / Overview Cards */}
@@ -1128,102 +1264,133 @@ export function PublicProfile({ currentUser }) {
                   Production architectures benchmarked for concurrency, resilience, and clean code
                 </p>
               </div>
-              <span className="font-mono text-xs font-bold px-2.5 py-1 bg-white border border-black rounded shadow-[2px_2px_0px_0px_#000]">
-                {profile.projects?.length || 0} Verified Repos
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-xs font-bold px-2.5 py-1 bg-white border border-black rounded shadow-[2px_2px_0px_0px_#000]">
+                  {profile.projects?.length || 0} Verified Repos
+                </span>
+                {isSelf && (
+                  <Link
+                    to="/settings"
+                    className="font-mono text-xs font-bold px-2.5 py-1 bg-black text-white hover:bg-neutral-800 rounded border border-black inline-flex items-center gap-1.5 transition-colors shadow-xs"
+                    title="Manage & Tick Projects for Jake's ATS Resume in Settings"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    <span>Manage &amp; Tick Resume</span>
+                  </Link>
+                )}
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              {profile.projects?.map((proj) => (
-                <div
-                  key={proj.id}
-                  className="bg-white border-2 border-black rounded-xl p-5 shadow-[4px_4px_0px_0px_#000] flex flex-col justify-between"
-                >
-                  <div>
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <h3 className="font-black text-base tracking-tight leading-snug">{proj.title}</h3>
-                      <span className="font-mono text-[10px] uppercase font-bold px-2 py-0.5 bg-emerald-100 text-emerald-900 border border-emerald-600 rounded shrink-0">
-                        {proj.status || 'Verified'}
-                      </span>
-                    </div>
+              {profile.projects?.map((proj) => {
+                const isResumeFeatured = (profile.selectedResumeProjectIds || ['proj_prepstack', 'proj_flashdrop']).includes(proj.id);
+                const techList = Array.isArray(proj.techStack) 
+                  ? proj.techStack 
+                  : (typeof proj.techStack === 'string' ? proj.techStack.split(',').map(s => s.trim()).filter(Boolean) : []);
+                const projectDesc = proj.description || (Array.isArray(proj.bullets) ? proj.bullets[0] : (typeof proj.bullets === 'string' ? proj.bullets.split('\n')[0] : ''));
 
-                    <p className="text-xs text-neutral-700 leading-relaxed mb-3">
-                      {proj.description}
-                    </p>
-
-                    {/* Architecture placement highlight */}
-                    {proj.placementHighlight && (
-                      <div className="p-2.5 bg-neutral-100 border-l-4 border-black rounded-r text-xs font-mono text-neutral-800 mb-3">
-                        <span className="font-bold block text-[10px] uppercase tracking-wider text-black/60 mb-0.5">
-                          Engineering Highlight:
-                        </span>
-                        {proj.placementHighlight}
+                return (
+                  <div
+                    key={proj.id}
+                    className="bg-white border-2 border-black rounded-xl p-5 shadow-[4px_4px_0px_0px_#000] flex flex-col justify-between"
+                  >
+                    <div>
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <h3 className="font-black text-base tracking-tight leading-snug">{proj.title}</h3>
+                        <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+                          {isResumeFeatured && (
+                            <span className="font-mono text-[10px] font-bold px-2 py-0.5 bg-emerald-100 text-emerald-950 border border-emerald-600 rounded flex items-center gap-1 shrink-0">
+                              ✓ ATS Resume
+                            </span>
+                          )}
+                          <span className="font-mono text-[10px] uppercase font-bold px-2 py-0.5 bg-neutral-100 text-neutral-800 border border-black/30 rounded shrink-0">
+                            {proj.status || 'Verified'}
+                          </span>
+                        </div>
                       </div>
-                    )}
 
-                    {/* Tech stack badges */}
-                    <div className="flex flex-wrap gap-1.5 mb-4">
-                      {proj.techStack?.map((t, idx) => (
-                        <span
-                          key={idx}
-                          className="font-mono text-[10px] font-bold px-2 py-0.5 bg-neutral-100 border border-black/30 rounded"
-                        >
-                          {t}
-                        </span>
-                      ))}
+                      {projectDesc && (
+                        <p className="text-xs text-neutral-700 leading-relaxed mb-3">
+                          {projectDesc}
+                        </p>
+                      )}
+
+                      {/* Architecture placement highlight */}
+                      {proj.placementHighlight && (
+                        <div className="p-2.5 bg-neutral-100 border-l-4 border-black rounded-r text-xs font-mono text-neutral-800 mb-3">
+                          <span className="font-bold block text-[10px] uppercase tracking-wider text-black/60 mb-0.5">
+                            Engineering Highlight:
+                          </span>
+                          {proj.placementHighlight}
+                        </div>
+                      )}
+
+                      {/* Tech stack badges */}
+                      {techList.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 mb-4">
+                          {techList.map((t, idx) => (
+                            <span
+                              key={idx}
+                              className="font-mono text-[10px] font-bold px-2 py-0.5 bg-neutral-100 border border-black/30 rounded"
+                            >
+                              {t}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Evidence & Action Links */}
+                    <div className="pt-3 border-t border-black/10 flex items-center justify-between text-xs font-mono">
+                      <div className="flex items-center gap-3 text-neutral-600 font-semibold text-[11px]">
+                        {proj.evidence?.commits && (
+                          <span className="flex items-center gap-1">
+                            <GitCommit className="w-3.5 h-3.5" />
+                            {proj.evidence.commits} commits
+                          </span>
+                        )}
+                        {proj.evidence?.pullRequests && (
+                          <span className="flex items-center gap-1">
+                            <GitPullRequest className="w-3.5 h-3.5" />
+                            {proj.evidence.pullRequests} PRs
+                          </span>
+                        )}
+                        {proj.evidence?.stars && (
+                          <span className="flex items-center gap-1">
+                            <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                            {proj.evidence.stars}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        {proj.liveDemo && (
+                          <a
+                            href={proj.liveDemo}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-bold flex items-center gap-1 text-black hover:underline"
+                          >
+                            <span>Demo</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        )}
+                        {proj.githubUrl && (
+                          <a
+                            href={proj.githubUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-bold flex items-center gap-1 text-black hover:underline"
+                          >
+                            <span>Code</span>
+                            <ArrowUpRight className="w-3 h-3" />
+                          </a>
+                        )}
+                      </div>
                     </div>
                   </div>
-
-                  {/* Evidence & Action Links */}
-                  <div className="pt-3 border-t border-black/10 flex items-center justify-between text-xs font-mono">
-                    <div className="flex items-center gap-3 text-neutral-600 font-semibold text-[11px]">
-                      {proj.evidence?.commits && (
-                        <span className="flex items-center gap-1">
-                          <GitCommit className="w-3.5 h-3.5" />
-                          {proj.evidence.commits} commits
-                        </span>
-                      )}
-                      {proj.evidence?.pullRequests && (
-                        <span className="flex items-center gap-1">
-                          <GitPullRequest className="w-3.5 h-3.5" />
-                          {proj.evidence.pullRequests} PRs
-                        </span>
-                      )}
-                      {proj.evidence?.stars && (
-                        <span className="flex items-center gap-1">
-                          <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
-                          {proj.evidence.stars}
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      {proj.liveDemo && (
-                        <a
-                          href={proj.liveDemo}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="font-bold flex items-center gap-1 text-black hover:underline"
-                        >
-                          <span>Demo</span>
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
-                      )}
-                      {proj.githubUrl && (
-                        <a
-                          href={proj.githubUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="font-bold flex items-center gap-1 text-black hover:underline"
-                        >
-                          <span>Code</span>
-                          <ArrowUpRight className="w-3 h-3" />
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </section>
         )}
@@ -1314,7 +1481,13 @@ export function PublicProfile({ currentUser }) {
           email: profile.email || (isSelf ? currentUser?.email : null),
           privacy: profile.privacy || (isSelf ? currentUser?.privacy : null),
           achievements: (candidateAchievements.length > 0) ? candidateAchievements : (profile.achievements || []),
-          extracurriculars: (candidateExtracurriculars.length > 0) ? candidateExtracurriculars : (profile.extracurriculars || [])
+          extracurriculars: (candidateExtracurriculars.length > 0) ? candidateExtracurriculars : (profile.extracurriculars || []),
+          class12: profile.class12 || profile.academic?.class12 || (isSelf ? (currentUser?.class12 || currentUser?.academic?.class12) : null),
+          class10: profile.class10 || profile.academic?.class10 || (isSelf ? (currentUser?.class10 || currentUser?.academic?.class10) : null),
+          experience: (Array.isArray(profile.experience) && profile.experience.length > 0) ? profile.experience : (isSelf ? (currentUser?.experience || []) : []),
+          technicalSkills: profile.technicalSkills || (isSelf ? currentUser?.technicalSkills : null),
+          projects: (Array.isArray(profile.projects) && profile.projects.length > 0) ? profile.projects : (isSelf ? (currentUser?.projects || []) : []),
+          selectedResumeProjectIds: profile.selectedResumeProjectIds || (isSelf ? currentUser?.selectedResumeProjectIds : null)
         } : null} 
       />
     </div>

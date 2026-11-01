@@ -134,7 +134,13 @@ export function saveOrMergeUser(userData) {
           : (userData.academic?.achievements ?? userData.achievements ?? existing.academic?.achievements ?? existing.achievements ?? []),
         extracurriculars: (isExplicit && (userData.academic?.extracurriculars !== undefined || userData.extracurriculars !== undefined))
           ? (userData.academic?.extracurriculars ?? userData.extracurriculars ?? [])
-          : (userData.academic?.extracurriculars ?? userData.extracurriculars ?? existing.academic?.extracurriculars ?? existing.extracurriculars ?? [])
+          : (userData.academic?.extracurriculars ?? userData.extracurriculars ?? existing.academic?.extracurriculars ?? existing.extracurriculars ?? []),
+        class12: (isExplicit && userData.academic?.class12 !== undefined)
+          ? userData.academic.class12
+          : (userData.academic?.class12 ?? existing.academic?.class12 ?? null),
+        class10: (isExplicit && userData.academic?.class10 !== undefined)
+          ? userData.academic.class10
+          : (userData.academic?.class10 ?? existing.academic?.class10 ?? null)
       },
       achievements: (isExplicit && (userData.achievements !== undefined || userData.academic?.achievements !== undefined))
         ? (userData.achievements ?? userData.academic?.achievements ?? [])
@@ -142,6 +148,18 @@ export function saveOrMergeUser(userData) {
       extracurriculars: (isExplicit && (userData.extracurriculars !== undefined || userData.academic?.extracurriculars !== undefined))
         ? (userData.extracurriculars ?? userData.academic?.extracurriculars ?? [])
         : (userData.extracurriculars ?? userData.academic?.extracurriculars ?? existing.extracurriculars ?? existing.academic?.extracurriculars ?? []),
+      experience: (isExplicit && userData.experience !== undefined)
+        ? userData.experience
+        : (userData.experience ?? existing.experience ?? []),
+      technicalSkills: (isExplicit && userData.technicalSkills !== undefined)
+        ? userData.technicalSkills
+        : (userData.technicalSkills ?? existing.technicalSkills ?? null),
+      projects: (isExplicit && userData.projects !== undefined)
+        ? userData.projects
+        : (userData.projects ?? existing.projects ?? null),
+      selectedResumeProjectIds: (isExplicit && userData.selectedResumeProjectIds !== undefined)
+        ? userData.selectedResumeProjectIds
+        : (userData.selectedResumeProjectIds ?? existing.selectedResumeProjectIds ?? null),
       providers: updatedProviders,
       provider: userData.provider || existing.provider,
       password: userData.password || existing.password || null,
@@ -192,10 +210,16 @@ export function saveOrMergeUser(userData) {
       dreamCompanies: userData.academic?.dreamCompanies || 'Google, Microsoft, Uber, Atlassian',
       workMode: userData.academic?.workMode || 'Hybrid / Remote / On-site',
       achievements: userData.academic?.achievements || userData.achievements || [],
-      extracurriculars: userData.academic?.extracurriculars || userData.extracurriculars || []
+      extracurriculars: userData.academic?.extracurriculars || userData.extracurriculars || [],
+      class12: userData.academic?.class12 || null,
+      class10: userData.academic?.class10 || null
     },
     achievements: userData.achievements || userData.academic?.achievements || [],
     extracurriculars: userData.extracurriculars || userData.academic?.extracurriculars || [],
+    experience: userData.experience || [],
+    technicalSkills: userData.technicalSkills || null,
+    projects: userData.projects || null,
+    selectedResumeProjectIds: userData.selectedResumeProjectIds || null,
     providers: [userData.provider || 'email'],
     provider: userData.provider || 'email',
     handles: {
@@ -276,6 +300,24 @@ export function updateUserProfile(email, profileData = {}) {
           : []);
       user.academic.extracurriculars = user.extracurriculars;
     }
+    if (profileData.academic.class12 !== undefined) {
+      user.academic.class12 = profileData.academic.class12;
+      user.class12 = profileData.academic.class12;
+    }
+    if (profileData.academic.class10 !== undefined) {
+      user.academic.class10 = profileData.academic.class10;
+      user.class10 = profileData.academic.class10;
+    }
+  }
+  if (profileData.class12 !== undefined) {
+    if (!user.academic) user.academic = {};
+    user.academic.class12 = profileData.class12;
+    user.class12 = profileData.class12;
+  }
+  if (profileData.class10 !== undefined) {
+    if (!user.academic) user.academic = {};
+    user.academic.class10 = profileData.class10;
+    user.class10 = profileData.class10;
   }
   if (profileData.achievements !== undefined) {
     user.achievements = Array.isArray(profileData.achievements)
@@ -294,6 +336,20 @@ export function updateUserProfile(email, profileData = {}) {
         : []);
     if (!user.academic) user.academic = {};
     user.academic.extracurriculars = user.extracurriculars;
+  }
+  if (profileData.experience !== undefined) {
+    user.experience = Array.isArray(profileData.experience) ? profileData.experience : [];
+  }
+  if (profileData.technicalSkills !== undefined) {
+    user.technicalSkills = profileData.technicalSkills;
+  }
+  if (profileData.projects !== undefined) {
+    user.projects = Array.isArray(profileData.projects) ? profileData.projects : null;
+  }
+  if (profileData.selectedResumeProjectIds !== undefined) {
+    user.selectedResumeProjectIds = Array.isArray(profileData.selectedResumeProjectIds)
+      ? profileData.selectedResumeProjectIds
+      : null;
   }
   user.updatedAt = new Date().toISOString();
 

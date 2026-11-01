@@ -845,7 +845,26 @@ router.get('/user/:email', (req, res) => {
  * Updates public username, academic credentials (CGPA, college, graduation year), handles, and target role
  */
 router.post('/profile', (req, res) => {
-  const { email, username, name, targetRole, academic, handles, avatarUrl, phone, privacy, customWeights, achievements, extracurriculars } = req.body;
+  const {
+    email,
+    username,
+    name,
+    targetRole,
+    academic,
+    handles,
+    avatarUrl,
+    phone,
+    privacy,
+    customWeights,
+    achievements,
+    extracurriculars,
+    experience,
+    technicalSkills,
+    projects,
+    selectedResumeProjectIds,
+    class12,
+    class10
+  } = req.body;
   if (!email) {
     return res.status(400).json({ success: false, message: 'User email is required' });
   }
@@ -862,7 +881,13 @@ router.post('/profile', (req, res) => {
       privacy,
       customWeights,
       achievements,
-      extracurriculars
+      extracurriculars,
+      experience,
+      technicalSkills,
+      projects,
+      selectedResumeProjectIds,
+      class12,
+      class10
     });
 
     if (!updated) {

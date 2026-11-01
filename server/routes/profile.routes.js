@@ -104,6 +104,8 @@ router.get('/:identifier', async (req, res) => {
       },
       achievements: matchedUser?.achievements || matchedUser?.academic?.achievements || [],
       extracurriculars: matchedUser?.extracurriculars || matchedUser?.academic?.extracurriculars || [],
+      class12: matchedUser?.class12 || matchedUser?.academic?.class12 || null,
+      class10: matchedUser?.class10 || matchedUser?.academic?.class10 || null,
       bio: ghStats?.profile?.bio || `Aspiring ${targetRole} with verified competency across Data Structures, Algorithms, Distributed Systems, and Full-Stack Engineering.`,
       location: ghStats?.profile?.location || 'India',
       handles: {
@@ -162,7 +164,10 @@ router.get('/:identifier', async (req, res) => {
         totalStars: ghStats?.profile?.totalStars || 0,
         calendar: ghStats?.calendar || null
       },
-      projects: defaultWebDevData.projects,
+      projects: matchedUser?.projects || defaultWebDevData.projects,
+      selectedResumeProjectIds: matchedUser?.selectedResumeProjectIds || null,
+      experience: matchedUser?.experience || [],
+      technicalSkills: matchedUser?.technicalSkills || null,
       systemDesign: {
         topicsTotal: defaultSystemDesignData.topics.length,
         coreFoundations: defaultSystemDesignData.topics.slice(0, 6).map(t => ({ id: t.id, name: t.name, category: t.category })),

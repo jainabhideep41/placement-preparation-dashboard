@@ -206,12 +206,13 @@ async function runTests() {
     'Mentor for Data Structures & Algorithms Club (mentored 80+ juniors)'
   ];
 
+  const testUsername = 'cand_' + Date.now();
   const profileRes7 = await fetch(`${BASE_URL}/api/auth/profile`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       email: testEmail,
-      username: 'deepcandidate',
+      username: testUsername,
       achievements: testAchievements,
       extracurriculars: testExtracurriculars
     })
@@ -224,7 +225,7 @@ async function runTests() {
   }
 
   // Fetch public profile and verify presence of achievements and extracurriculars
-  const publicRes7 = await fetch(`${BASE_URL}/api/public/profile/deepcandidate`);
+  const publicRes7 = await fetch(`${BASE_URL}/api/public/profile/${testUsername}`);
   const publicData7 = await publicRes7.json();
   console.log('Public Profile Achievements:', publicData7.profile?.achievements?.length, '(Expected: 2)');
   console.log('Public Profile Extracurriculars:', publicData7.profile?.extracurriculars?.length, '(Expected: 2)');
@@ -242,6 +243,60 @@ async function runTests() {
   console.log('User next login achievements retained:', nextSessionWithOAuth.achievements?.length, '(Expected: 2)');
   if (nextSessionWithOAuth.achievements?.length !== 2) {
     throw new Error('Test 7 Failed: Subsequent OAuth login did not preserve achievements');
+  }
+
+  // 8. Test 10th/12th Education, Work Experience, Technical Skills, and Projects Selection
+  console.log('\n[Test 8] Test 10th/12th Education, Experience, Technical Skills, and Resume Projects Selection...');
+  const testClass12 = { school: 'Delhi Public School', board: 'CBSE', year: '2022', score: '95.4%' };
+  const testClass10 = { school: 'St. Xavier High School', board: 'ICSE', year: '2020', score: '96.8%' };
+  const testExperience = [
+    { id: 'exp_test_1', role: 'SDE Intern', company: 'Google', location: 'Bengaluru', duration: 'May 2024 -- July 2024', bullets: ['Built caching service'] }
+  ];
+  const testTechnicalSkills = {
+    languages: 'C++, Go, Python, TypeScript',
+    frameworks: 'React 19, Express, Node.js',
+    databases: 'PostgreSQL, Redis',
+    developerTools: 'Docker, Linux, Git',
+    coreConcepts: 'DSA, System Design'
+  };
+  const testProjects = [
+    { id: 'proj_custom_1', title: 'Raft KV Store', techStack: 'Go, gRPC', date: '2024', bullets: ['Implemented leader election'] }
+  ];
+  const testSelectedResumeProjectIds = ['proj_custom_1'];
+
+  const profileRes8 = await fetch(`${BASE_URL}/api/auth/profile`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email: testEmail,
+      class12: testClass12,
+      class10: testClass10,
+      experience: testExperience,
+      technicalSkills: testTechnicalSkills,
+      projects: testProjects,
+      selectedResumeProjectIds: testSelectedResumeProjectIds
+    })
+  });
+  const profileData8 = await profileRes8.json();
+  console.log('Class 12 Score saved:', profileData8.user?.academic?.class12?.score, '(Expected: 95.4%)');
+  console.log('Class 10 Score saved:', profileData8.user?.academic?.class10?.score, '(Expected: 96.8%)');
+  console.log('Work Experience count:', profileData8.user?.experience?.length, '(Expected: 1)');
+  console.log('Technical Skills languages:', profileData8.user?.technicalSkills?.languages, '(Expected: C++, Go, Python, TypeScript)');
+  console.log('Selected Resume Project IDs:', profileData8.user?.selectedResumeProjectIds, '(Expected: ["proj_custom_1"])');
+
+  if (profileData8.user?.academic?.class12?.score !== '95.4%' || profileData8.user?.experience?.length !== 1) {
+    throw new Error('Test 8 Failed: Class 12 or Experience not persisted in user profile');
+  }
+
+  // Fetch Public Profile and verify new fields
+  const publicRes8 = await fetch(`${BASE_URL}/api/public/profile/${testUsername}`);
+  const publicData8 = await publicRes8.json();
+  console.log('Public Profile Class 12:', publicData8.profile?.class12?.school, '(Expected: Delhi Public School)');
+  console.log('Public Profile Experience:', publicData8.profile?.experience?.length, '(Expected: 1)');
+  console.log('Public Profile Selected Projects:', publicData8.profile?.selectedResumeProjectIds, '(Expected: ["proj_custom_1"])');
+
+  if (publicData8.profile?.class12?.school !== 'Delhi Public School' || publicData8.profile?.experience?.length !== 1) {
+    throw new Error('Test 8 Failed: Public profile did not return education or experience');
   }
 
   console.log('\n>>> ALL MULTI-PROVIDER AUTHENTICATION UNIFICATION & RESUME SECTION TESTS PASSED! <<<');

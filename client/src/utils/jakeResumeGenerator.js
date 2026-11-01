@@ -63,9 +63,29 @@ export function getResumeStructuredData(profile, options = {}) {
   const leetcodeHandle = sanitizeHandle(handles.leetcode || lc.username || profile?.identifier || 'leetcode-user');
   const codeforcesHandle = sanitizeHandle(handles.codeforces || cf.username || '');
 
+  // Education details for 12th and 10th
+  const class12 = academic.class12 || profile?.class12 || null;
+  const class10 = academic.class10 || profile?.class10 || null;
+
+  // Work Experience & Internships
+  const rawExperience = Array.isArray(profile?.experience) ? profile.experience : [];
+  const experience = rawExperience.map((exp, idx) => ({
+    id: exp.id || `exp_${idx}`,
+    role: exp.role || 'Software Engineering Intern',
+    company: exp.company || 'Tech Company',
+    location: exp.location || 'India',
+    duration: exp.duration || '2024 -- 2025',
+    bullets: Array.isArray(exp.bullets)
+      ? exp.bullets
+      : (typeof exp.bullets === 'string'
+        ? exp.bullets.split('\n').map(s => s.trim().replace(/^[-*•]\s*/, '')).filter(Boolean)
+        : [exp.description || 'Engineered production software features and collaborated with cross-functional teams.'])
+  }));
+
   // Standardize projects (minimum 2 high-impact software projects)
   const defaultProjects = [
     {
+      id: 'proj_prepstack',
       title: 'PrepStack — Placement Readiness & Developer Portfolio Engine',
       techStack: 'React 19, Node.js, Express, Tailwind CSS, Redis',
       githubUrl: `https://github.com/${githubHandle}/placement-preparation-dashboard`,
@@ -78,6 +98,7 @@ export function getResumeStructuredData(profile, options = {}) {
       ]
     },
     {
+      id: 'proj_flashdrop',
       title: 'FlashDrop — High-Concurrency Flash Sale & Inventory Engine',
       techStack: 'Node.js, Redis, Apache Kafka, PostgreSQL, Docker',
       githubUrl: `https://github.com/${githubHandle}/flashdrop-inventory`,
@@ -91,28 +112,45 @@ export function getResumeStructuredData(profile, options = {}) {
     }
   ];
 
-  const projects = rawProjects.length > 0
-    ? rawProjects.map((p, idx) => ({
-        title: p.title || `Project ${idx + 1}`,
-        techStack: Array.isArray(p.techStack) ? p.techStack.join(', ') : (p.techStack || 'React, Node.js, Express, PostgreSQL'),
-        githubUrl: p.githubUrl || `https://github.com/${githubHandle}`,
-        liveDemo: p.liveDemo || '',
-        date: p.date || '2023 -- 2024',
-        bullets: p.bullets || [
-          p.description || 'Engineered high-performance web service with RESTful APIs and modern frontend design.',
-          p.placementHighlight || 'Designed scalable schema with ACID transaction isolation and responsive UI architecture.',
-          `Tracked verified open-source contributions with ${p.evidence?.commits || 40}+ commits and ${p.evidence?.pullRequests || 10}+ pull requests.`
-        ]
-      }))
-    : defaultProjects;
+  const candidateProjects = (Array.isArray(profile?.projects) && profile.projects.length > 0)
+    ? profile.projects
+    : (rawProjects.length > 0 ? rawProjects : defaultProjects);
 
-  // Technical Skills
-  const technicalSkills = {
+  const standardizedProjects = candidateProjects.map((p, idx) => ({
+    id: p.id || `proj_${idx}`,
+    title: p.title || `Project ${idx + 1}`,
+    techStack: Array.isArray(p.techStack) ? p.techStack.join(', ') : (p.techStack || 'React, Node.js, Express, PostgreSQL'),
+    githubUrl: p.githubUrl || `https://github.com/${githubHandle}`,
+    liveDemo: p.liveDemo || '',
+    date: p.date || '2023 -- 2024',
+    bullets: p.bullets || [
+      p.description || 'Engineered high-performance web service with RESTful APIs and modern frontend design.',
+      p.placementHighlight || 'Designed scalable schema with ACID transaction isolation and responsive UI architecture.',
+      `Tracked verified open-source contributions with ${p.evidence?.commits || 40}+ commits and ${p.evidence?.pullRequests || 10}+ pull requests.`
+    ]
+  }));
+
+  // Selected projects ticked by the user for resume
+  const selectedResumeProjectIds = profile?.selectedResumeProjectIds || options.selectedResumeProjectIds || null;
+  const projects = (Array.isArray(selectedResumeProjectIds) && selectedResumeProjectIds.length > 0)
+    ? standardizedProjects.filter(p => selectedResumeProjectIds.includes(p.id))
+    : standardizedProjects.slice(0, 2);
+
+  // Technical Skills (Modifiable with defaults)
+  const defaultTechnicalSkills = {
     languages: 'C/C++, Java, Python, JavaScript (ES6+), TypeScript, SQL, HTML5/CSS3',
     frameworks: 'React 19, Next.js, Node.js, Express.js, Tailwind CSS, RESTful APIs, WebSockets',
     developerTools: 'Git, GitHub Actions, Docker, Linux/Unix, Postman, Vite, Vercel',
     databases: 'PostgreSQL, Redis (In-Memory Caching), MongoDB, MySQL',
     coreConcepts: 'Data Structures & Algorithms, High-Level System Design (HLD), Low-Level Design (LLD), Microservices, Concurrency'
+  };
+
+  const technicalSkills = {
+    languages: profile?.technicalSkills?.languages || defaultTechnicalSkills.languages,
+    frameworks: profile?.technicalSkills?.frameworks || defaultTechnicalSkills.frameworks,
+    databases: profile?.technicalSkills?.databases || defaultTechnicalSkills.databases,
+    developerTools: profile?.technicalSkills?.developerTools || defaultTechnicalSkills.developerTools,
+    coreConcepts: profile?.technicalSkills?.coreConcepts || defaultTechnicalSkills.coreConcepts
   };
 
   // Competitive Programming, Achievements & Honors
@@ -159,13 +197,18 @@ export function getResumeStructuredData(profile, options = {}) {
     year,
     cgpa,
     location,
+    class12,
+    class10,
     email,
     phone,
     linkedinHandle,
     githubHandle,
     leetcodeHandle,
     codeforcesHandle,
+    experience,
     projects,
+    allProjects: standardizedProjects,
+    selectedResumeProjectIds,
     technicalSkills,
     achievements,
     extracurriculars,
@@ -197,6 +240,34 @@ export function generateJakeResumeLatex(profile, options = {}) {
   }
 
   const contactLine = contactItems.join(' $|$ ');
+
+  // Class 12 & Class 10 Education LaTeX
+  let class12Latex = '';
+  if (data.class12 && (data.class12.school || data.class12.score)) {
+    const scoreStr = data.class12.score ? `; Aggregate: ${escapeLatex(data.class12.score)}` : '';
+    class12Latex = `    \\resumeSubheading
+      {${escapeLatex(data.class12.school || 'Senior Secondary School')}}{${escapeLatex(data.class12.board || 'CBSE')}}
+      {Class XII (Senior Secondary)${scoreStr}}{${escapeLatex(data.class12.year || '2022')}}`;
+  }
+
+  let class10Latex = '';
+  if (data.class10 && (data.class10.school || data.class10.score)) {
+    const scoreStr = data.class10.score ? `; Aggregate: ${escapeLatex(data.class10.score)}` : '';
+    class10Latex = `    \\resumeSubheading
+      {${escapeLatex(data.class10.school || 'Secondary School')}}{${escapeLatex(data.class10.board || 'CBSE')}}
+      {Class X (Secondary)${scoreStr}}{${escapeLatex(data.class10.year || '2020')}}`;
+  }
+
+  // Experience LaTeX
+  const experienceLatex = (data.experience || []).map(exp => {
+    const bulletsLatex = exp.bullets.map(b => `          \\resumeItem{${escapeLatex(b)}}`).join('\n');
+    return `    \\resumeSubheading
+      {${escapeLatex(exp.role)}}{${escapeLatex(exp.duration)}}
+      {${escapeLatex(exp.company)}}{${escapeLatex(exp.location)}}
+      \\resumeItemListStart
+${bulletsLatex}
+      \\resumeItemListEnd`;
+  }).join('\n');
 
   const projectsLatex = data.projects.map(p => {
     const linkStr = p.githubUrl ? `\\href{${p.githubUrl}}{\\underline{GitHub}}` : '';
@@ -312,7 +383,14 @@ ${bulletsLatex}
     \\resumeSubheading
       {${escapeLatex(data.college)}}{${escapeLatex(data.location)}}
       {${escapeLatex(data.degree)}; CGPA: ${escapeLatex(data.cgpa)}}{${escapeLatex(data.year)}}
+${class12Latex ? `${class12Latex}\n` : ''}${class10Latex ? `${class10Latex}\n` : ''}  \\resumeSubHeadingListEnd
+${experienceLatex ? `
+%-----------EXPERIENCE-----------
+\\section{Experience}
+  \\resumeSubHeadingListStart
+${experienceLatex}
   \\resumeSubHeadingListEnd
+` : ''}
 
 %-----------TECHNICAL SKILLS-----------
 \\section{Technical Skills}

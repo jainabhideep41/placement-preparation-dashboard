@@ -75,7 +75,9 @@ export function saveUserToRegistry(user, isExplicitUpdate = false) {
             : (existing?.academic?.achievements ?? existing?.achievements ?? []),
           extracurriculars: (user.academic?.extracurriculars !== undefined || user.extracurriculars !== undefined)
             ? (user.academic?.extracurriculars ?? user.extracurriculars ?? [])
-            : (existing?.academic?.extracurriculars ?? existing?.extracurriculars ?? [])
+            : (existing?.academic?.extracurriculars ?? existing?.extracurriculars ?? []),
+          class12: user.academic?.class12 !== undefined ? user.academic.class12 : (existing?.academic?.class12 ?? null),
+          class10: user.academic?.class10 !== undefined ? user.academic.class10 : (existing?.academic?.class10 ?? null)
         }
       : {
           college: existing?.academic?.college ?? user.academic?.college ?? 'Chandigarh University',
@@ -87,7 +89,9 @@ export function saveUserToRegistry(user, isExplicitUpdate = false) {
           dreamCompanies: existing?.academic?.dreamCompanies ?? user.academic?.dreamCompanies ?? 'Google, Microsoft, Uber, Atlassian',
           workMode: existing?.academic?.workMode ?? user.academic?.workMode ?? 'Hybrid / Remote / On-site',
           achievements: existing?.academic?.achievements ?? existing?.achievements ?? user.academic?.achievements ?? user.achievements ?? [],
-          extracurriculars: existing?.academic?.extracurriculars ?? existing?.extracurriculars ?? user.academic?.extracurriculars ?? user.extracurriculars ?? []
+          extracurriculars: existing?.academic?.extracurriculars ?? existing?.extracurriculars ?? user.academic?.extracurriculars ?? user.extracurriculars ?? [],
+          class12: existing?.academic?.class12 ?? user.academic?.class12 ?? null,
+          class10: existing?.academic?.class10 ?? user.academic?.class10 ?? null
         },
     achievements: isExplicitUpdate
       ? ((user.achievements !== undefined || user.academic?.achievements !== undefined)
@@ -99,6 +103,18 @@ export function saveUserToRegistry(user, isExplicitUpdate = false) {
         ? (user.extracurriculars ?? user.academic?.extracurriculars ?? [])
         : (existing?.extracurriculars ?? existing?.academic?.extracurriculars ?? []))
       : (existing?.extracurriculars ?? existing?.academic?.extracurriculars ?? user.extracurriculars ?? user.academic?.extracurriculars ?? []),
+    experience: isExplicitUpdate
+      ? (user.experience !== undefined ? user.experience : (existing?.experience ?? []))
+      : (existing?.experience ?? user.experience ?? []),
+    technicalSkills: isExplicitUpdate
+      ? (user.technicalSkills !== undefined ? user.technicalSkills : (existing?.technicalSkills ?? null))
+      : (existing?.technicalSkills ?? user.technicalSkills ?? null),
+    projects: isExplicitUpdate
+      ? (user.projects !== undefined ? user.projects : (existing?.projects ?? null))
+      : (existing?.projects ?? user.projects ?? null),
+    selectedResumeProjectIds: isExplicitUpdate
+      ? (user.selectedResumeProjectIds !== undefined ? user.selectedResumeProjectIds : (existing?.selectedResumeProjectIds ?? null))
+      : (existing?.selectedResumeProjectIds ?? user.selectedResumeProjectIds ?? null),
     providers: updatedProviders,
     provider: existing?.provider || user.provider || 'email',
     password: user.password || existing?.password || null,
