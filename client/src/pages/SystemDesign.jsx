@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { 
   ServerCog, 
   CheckCircle2, 
@@ -28,6 +29,7 @@ import { systemDesignTopics, systemDesignCaseStudies } from '../data/systemDesig
 
 export function SystemDesign({ progressHook }) {
   const { sysDesignData, loading, toggleSysDesignTopic, updateCaseStudyStatus } = progressHook;
+  const location = useLocation();
   const [activeTab, setActiveTab] = useState('topics'); // 'topics' | 'casestudies' | 'architecture' | 'cheatsheet'
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
@@ -36,6 +38,31 @@ export function SystemDesign({ progressHook }) {
   const [readerData, setReaderData] = useState(null);
   const [readerType, setReaderType] = useState('topic'); // 'topic' | 'casestudy'
   const [isReaderOpen, setIsReaderOpen] = useState(false);
+
+  // Sync incoming state from Universal Search
+  useEffect(() => {
+    if (location.state?.tab) {
+      setActiveTab(location.state.tab);
+    }
+    if (location.state?.search) {
+      setSearchQuery(location.state.search);
+    }
+    if (location.state?.topicId) {
+      const topic = systemDesignTopics.find(t => t.id === location.state.topicId);
+      if (topic) {
+        setReaderData(topic);
+        setReaderType('topic');
+        setIsReaderOpen(true);
+      }
+    } else if (location.state?.caseStudyId) {
+      const cs = systemDesignCaseStudies.find(c => c.id === location.state.caseStudyId);
+      if (cs) {
+        setReaderData(cs);
+        setReaderType('casestudy');
+        setIsReaderOpen(true);
+      }
+    }
+  }, [location.state]);
 
   // Interactive Architecture Simulation State
   const [simulationCacheHit, setSimulationCacheHit] = useState(true);

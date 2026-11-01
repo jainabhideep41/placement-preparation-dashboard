@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { 
   Search, 
   RotateCw, 
@@ -13,10 +13,108 @@ import {
   ExternalLink,
   Code2,
   UserCheck,
-  Settings as SettingsIcon
+  Settings as SettingsIcon,
+  ServerCog,
+  Globe2,
+  Briefcase,
+  Layers,
+  ArrowRight
 } from 'lucide-react';
 import { Badge } from '../common/Badge';
-import { ALL_UNIQUE_PROBLEMS, matchProblem } from '../../utils/curatedSheetsManager';
+import { ALL_UNIQUE_PROBLEMS } from '../../utils/curatedSheetsManager';
+import { systemDesignTopics, systemDesignCaseStudies } from '../../data/systemDesignData';
+import { webDevRoadmaps, webDevProjects } from '../../data/webDevData';
+import { CALIBRATED_ROLES } from '../../pages/PlacementReadiness';
+
+// Pre-indexed Universal Multi-Tech-Stack Catalog
+const UNIVERSAL_CATALOG = [
+  // 1. DSA Problems (365 unique problems)
+  ...ALL_UNIQUE_PROBLEMS.map(p => ({
+    id: p.canonicalKey || p.id,
+    type: 'dsa',
+    category: 'DSA & CP',
+    title: p.title,
+    subtitle: `${p.platform} • ${p.difficulty}${p.rating ? ` (★ ${p.rating})` : ''} • ${p.topic}`,
+    problemUrl: p.problemUrl,
+    route: '/dsa',
+    state: { search: p.title },
+    searchTerms: `${p.title} ${p.platform} ${p.difficulty} ${p.topic} ${(p.sheets || []).map(s => s.sheetName).join(' ')}`.toLowerCase()
+  })),
+
+  // 2. System Design Core Foundations & Principles
+  ...systemDesignTopics.map(t => ({
+    id: t.id,
+    type: 'sysdesign',
+    category: 'System Design',
+    title: t.name,
+    subtitle: `${t.category} HLD Foundation • ${t.milestones?.length || 0} Modules • ${t.readTime}`,
+    route: '/system-design',
+    state: { tab: 'topics', search: t.name, topicId: t.id },
+    searchTerms: `${t.name} system design hld architecture ${t.category} ${(t.milestones || []).join(' ')} ${t.description || ''}`.toLowerCase()
+  })),
+
+  // 3. System Design Real-world Case Studies
+  ...systemDesignCaseStudies.map(cs => ({
+    id: cs.id,
+    type: 'sysdesign',
+    category: 'Case Study',
+    title: cs.title,
+    subtitle: `FAANG System Design Architecture • Scalability & Distributed Trade-offs`,
+    route: '/system-design',
+    state: { tab: 'casestudies', search: cs.title, caseStudyId: cs.id },
+    searchTerms: `${cs.title} case study system design hld architecture scalability distributed faang`.toLowerCase()
+  })),
+
+  // 4. Web Development Roadmaps
+  ...webDevRoadmaps.map(r => ({
+    id: r.id,
+    type: 'webdev',
+    category: 'Web Dev Roadmap',
+    title: r.title,
+    subtitle: `${r.badge} Architecture • ${r.milestones?.length || 0} Milestones`,
+    route: '/webdev',
+    state: { tab: 'roadmaps', roadmapId: r.id },
+    searchTerms: `${r.title} web dev full stack roadmap frontend backend databases devops ${r.badge} ${r.description || ''}`.toLowerCase()
+  })),
+
+  // 5. Web Development Individual Core Modules
+  ...webDevRoadmaps.flatMap(r => 
+    r.milestones.map(m => ({
+      id: m.id,
+      type: 'webdev',
+      category: 'Web Dev Module',
+      title: m.title,
+      subtitle: `${r.title} • ${m.badge} • ${m.readTime}`,
+      route: '/webdev',
+      state: { tab: 'roadmaps', roadmapId: r.id, search: m.title },
+      searchTerms: `${m.title} ${r.title} web dev milestone ${m.badge} ${m.summary || ''}`.toLowerCase()
+    }))
+  ),
+
+  // 6. Verified Production Placement Projects
+  ...webDevProjects.map(proj => ({
+    id: proj.id,
+    type: 'webdev',
+    category: 'System Project',
+    title: proj.title,
+    subtitle: `Verified Placement Project • ${(proj.techStack || []).join(', ') || 'Full Stack'}`,
+    route: '/webdev',
+    state: { tab: 'projects', search: proj.title },
+    searchTerms: `${proj.title} project portfolio ${(proj.techStack || []).join(' ')} ${proj.summary || ''}`.toLowerCase()
+  })),
+
+  // 7. Target Career Tracks & Roles
+  ...CALIBRATED_ROLES.map(role => ({
+    id: role.id,
+    type: 'career',
+    category: 'Career Track',
+    title: role.title,
+    subtitle: `${role.badge} • ${(role.techStack || []).slice(0, 3).join(', ')}`,
+    route: '/readiness',
+    state: { roleId: role.id },
+    searchTerms: `${role.title} career track role readiness placement ${(role.techStack || []).join(' ')} ${role.rationale || ''}`.toLowerCase()
+  }))
+];
 
 export function Navbar({ 
   onRefresh, 
@@ -29,8 +127,10 @@ export function Navbar({
   currentUser,
   onLogout
 }) {
+  const navigate = useNavigate();
   const [navSearchQuery, setNavSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [activeCategoryFilter, setActiveCategoryFilter] = useState('All'); // 'All' | 'dsa' | 'sysdesign' | 'webdev' | 'career'
   const searchRef = useRef(null);
 
   useEffect(() => {
@@ -44,9 +144,72 @@ export function Navbar({
   }, []);
 
   const searchResults = useMemo(() => {
-    if (!navSearchQuery.trim()) return [];
-    return ALL_UNIQUE_PROBLEMS.filter(p => matchProblem(p, navSearchQuery)).slice(0, 6);
-  }, [navSearchQuery]);
+    const q = navSearchQuery.trim().toLowerCase();
+    if (!q) return [];
+
+    const queryWords = q.split(/\s+/).filter(Boolean);
+
+    const matches = UNIVERSAL_CATALOG.filter(item => {
+      if (activeCategoryFilter !== 'All' && item.type !== activeCategoryFilter) {
+        return false;
+      }
+      return queryWords.every(word => item.searchTerms.includes(word));
+    });
+
+    return matches.slice(0, 10);
+  }, [navSearchQuery, activeCategoryFilter]);
+
+  const handleNavigateItem = (item) => {
+    setIsSearchOpen(false);
+    setNavSearchQuery('');
+    navigate(item.route, { state: item.state });
+  };
+
+  const getBadgeStyle = (type) => {
+    switch (type) {
+      case 'dsa':
+        return 'bg-amber-50 text-amber-900 border-amber-300';
+      case 'sysdesign':
+        return 'bg-purple-50 text-purple-900 border-purple-300';
+      case 'webdev':
+        return 'bg-sky-50 text-sky-900 border-sky-300';
+      case 'career':
+        return 'bg-emerald-50 text-emerald-900 border-emerald-300';
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-300';
+    }
+  };
+
+  const getActionBtnStyle = (type) => {
+    switch (type) {
+      case 'dsa':
+        return 'bg-black text-white hover:bg-neutral-800';
+      case 'sysdesign':
+        return 'bg-purple-700 text-white hover:bg-purple-800';
+      case 'webdev':
+        return 'bg-sky-700 text-white hover:bg-sky-800';
+      case 'career':
+        return 'bg-emerald-700 text-white hover:bg-emerald-800';
+      default:
+        return 'bg-black text-white hover:bg-neutral-800';
+    }
+  };
+
+  const getActionLabel = (type) => {
+    switch (type) {
+      case 'dsa':
+        return 'Practice';
+      case 'sysdesign':
+        return 'Study HLD';
+      case 'webdev':
+        return 'Explore';
+      case 'career':
+        return 'Calibrate';
+      default:
+        return 'View';
+    }
+  };
+
   return (
     <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b border-black/10 bg-white/95 px-4 lg:px-6 backdrop-blur-md">
       {/* Left branding & mobile toggle */}
@@ -78,8 +241,8 @@ export function Navbar({
         </Link>
       </div>
 
-      {/* Middle search bar */}
-      <div className="hidden md:flex items-center flex-1 max-w-md mx-6" ref={searchRef}>
+      {/* Middle Universal Multi-Tech-Stack Search Bar */}
+      <div className="hidden md:flex items-center flex-1 max-w-xl mx-6" ref={searchRef}>
         <div className="relative w-full">
           <Search className="absolute left-3 top-2.5 w-4 h-4 text-black/40" />
           <input
@@ -90,8 +253,15 @@ export function Navbar({
               setIsSearchOpen(true);
             }}
             onFocus={() => setIsSearchOpen(true)}
-            placeholder="Search all 365 questions, topics, patterns..."
-            className="w-full pl-9 pr-8 py-1.5 text-xs rounded-xl bg-[#F4F4F0] border border-black/10 text-black placeholder-black/40 focus:outline-none focus:border-black transition-colors"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && searchResults.length > 0) {
+                handleNavigateItem(searchResults[0]);
+              } else if (e.key === 'Escape') {
+                setIsSearchOpen(false);
+              }
+            }}
+            placeholder="Search across DSA, System Design, Full-Stack Web Dev, Roadmaps..."
+            className="w-full pl-9 pr-8 py-2 text-xs rounded-xl bg-[#F4F4F0] border border-black/10 text-black placeholder-black/40 focus:outline-none focus:border-black transition-colors"
           />
           {navSearchQuery && (
             <button
@@ -107,56 +277,79 @@ export function Navbar({
 
           {/* Quick Dropdown Results Panel */}
           {isSearchOpen && navSearchQuery.trim() && (
-            <div className="absolute left-0 right-0 top-full mt-2 bg-white rounded-2xl border-2 border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] overflow-hidden z-50 animate-fadeIn">
-              <div className="px-3.5 py-2 bg-[#F4F4F0] border-b border-black/10 flex items-center justify-between text-[11px] font-mono text-black/60">
-                <span>Matched Questions ({searchResults.length})</span>
-                <span>Press ESC or click outside to dismiss</span>
+            <div className="absolute left-0 right-0 top-full mt-2 bg-white rounded-2xl border-2 border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] overflow-hidden z-50 animate-fadeIn min-w-[320px] sm:min-w-[500px]">
+              <div className="px-3.5 py-2.5 bg-[#F4F4F0] border-b border-black/10 flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono text-black/60">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {[
+                    { id: 'All', label: 'All Stacks' },
+                    { id: 'dsa', label: 'DSA & CP' },
+                    { id: 'sysdesign', label: 'System Design' },
+                    { id: 'webdev', label: 'Web Dev' },
+                    { id: 'career', label: 'Career Tracks' }
+                  ].map(tab => (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveCategoryFilter(tab.id)}
+                      className={`px-2 py-0.5 rounded-md font-bold transition-colors ${
+                        activeCategoryFilter === tab.id
+                          ? 'bg-black text-white'
+                          : 'bg-white border border-black/10 text-black/70 hover:text-black'
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+                <span>{searchResults.length} {searchResults.length === 1 ? 'match' : 'matches'}</span>
               </div>
 
               {searchResults.length === 0 ? (
-                <div className="p-4 text-center text-xs text-black/50 font-mono">
-                  No questions match &ldquo;{navSearchQuery}&rdquo;
+                <div className="p-6 text-center text-xs text-black/50 font-mono">
+                  No items match &ldquo;{navSearchQuery}&rdquo; {activeCategoryFilter !== 'All' ? `in ${activeCategoryFilter}` : 'across any tech stack'}.
                 </div>
               ) : (
-                <div className="divide-y divide-black/5 max-h-80 overflow-y-auto">
+                <div className="divide-y divide-black/5 max-h-96 overflow-y-auto">
                   {searchResults.map((item) => (
                     <div 
-                      key={item.canonicalKey}
-                      className="p-3 hover:bg-[#F4F4F0] transition-colors flex items-center justify-between gap-3 text-xs"
+                      key={`${item.type}_${item.id}`}
+                      onClick={() => handleNavigateItem(item)}
+                      className="p-3 hover:bg-[#F4F4F0] transition-colors flex items-center justify-between gap-3 text-xs cursor-pointer group"
                     >
                       <div className="min-w-0 flex-1">
-                        <div className="font-bold text-black truncate hover:underline">
-                          <a href={item.problemUrl} target="_blank" rel="noopener noreferrer">
-                            {item.title}
-                          </a>
-                        </div>
-                        <div className="flex items-center gap-1.5 mt-1 text-[10px] font-mono text-black/60">
-                          <span className="font-semibold text-black">{item.platform}</span>
-                          <span>•</span>
-                          <span className={item.difficulty === 'Easy' ? 'text-emerald-700' : item.difficulty === 'Medium' ? 'text-amber-700' : 'text-rose-700'}>
-                            {item.difficulty}
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold border ${getBadgeStyle(item.type)}`}>
+                            {item.category}
                           </span>
-                          {item.rating && (
-                            <>
-                              <span>•</span>
-                              <span className="text-amber-700 font-bold">★ {item.rating}</span>
-                            </>
-                          )}
-                          <span>•</span>
-                          <span className="truncate">{item.topic}</span>
+                          <span className="font-bold text-black truncate group-hover:text-blue-600 transition-colors">
+                            {item.title}
+                          </span>
+                        </div>
+                        <div className="text-[11px] font-mono text-black/60 truncate">
+                          {item.subtitle}
                         </div>
                       </div>
 
-                      <a
-                        href={item.problemUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={() => setIsSearchOpen(false)}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-black text-white text-[11px] font-bold shadow-xs hover:bg-neutral-800 shrink-0"
-                      >
-                        <span>Solve</span>
-                        <ExternalLink className="w-3 h-3 text-white/80" />
-                      </a>
+                      <div className="flex items-center gap-1.5 shrink-0" onClick={e => e.stopPropagation()}>
+                        {item.type === 'dsa' && item.problemUrl && (
+                          <a
+                            href={item.problemUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-black text-white text-[11px] font-bold shadow-xs hover:bg-neutral-800"
+                            title="Open external problem link"
+                          >
+                            <span>Solve</span>
+                            <ExternalLink className="w-3 h-3 text-white/80" />
+                          </a>
+                        )}
+                        <button
+                          onClick={() => handleNavigateItem(item)}
+                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold shadow-xs transition-all ${getActionBtnStyle(item.type)}`}
+                        >
+                          <span>{getActionLabel(item.type)}</span>
+                          <ArrowRight className="w-3 h-3" />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>

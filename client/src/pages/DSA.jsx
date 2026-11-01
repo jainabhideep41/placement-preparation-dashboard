@@ -248,18 +248,64 @@ export function DSA({ dsaHook }) {
   };
 
   const handleDeleteMergedProblem = async (problem) => {
-    // If from curated sheet or has canonical key, remove from canonical solved map
-    if (problem.canonicalKey || problem.id?.startsWith('curated_') || ALL_UNIQUE_PROBLEMS.some(u => u.title?.toLowerCase() === problem.title?.toLowerCase())) {
-      setCanonicalSolvedMap(prev => {
-        const next = { ...prev };
-        const key = problem.canonicalKey || getCanonicalKey(problem);
-        delete next[key];
-        return next;
-      });
+    if (!problem) return;
+    const canonKey = problem.canonicalKey || getCanonicalKey(problem);
+    const titleKey = 'title:' + (problem.title || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    // Find any matching unique problem entry
+    const matchingUnique = ALL_UNIQUE_PROBLEMS.find(u => 
+      u.canonicalKey === canonKey || 
+      getCanonicalKey(u) === canonKey ||
+      (problem.title && u.title?.toLowerCase() === problem.title?.toLowerCase())
+    );
+
+    // 1. Scrub from canonical solved state across all alias keys
+    setCanonicalSolvedMap(prev => {
+      const next = { ...prev };
+      if (canonKey) delete next[canonKey];
+      if (titleKey) delete next[titleKey];
+      if (problem.canonicalKey) delete next[problem.canonicalKey];
+      if (problem.id) delete next[problem.id];
+      if (matchingUnique) {
+        delete next[matchingUnique.canonicalKey];
+        delete next[matchingUnique.id];
+        const refs = CANONICAL_TO_SHEETS_MAP[matchingUnique.canonicalKey] || [];
+        for (const ref of refs) {
+          delete next[ref.problemId];
+        }
+      }
+      return next;
+    });
+
+    // 2. Scrub from prep_revision_added_map in localStorage if present
+    try {
+      const revRaw = localStorage.getItem('prep_revision_added_map');
+      if (revRaw) {
+        const revMap = JSON.parse(revRaw);
+        delete revMap[problem.id];
+        delete revMap[canonKey];
+        delete revMap[titleKey];
+        if (problem.canonicalKey) delete revMap[problem.canonicalKey];
+        if (matchingUnique) {
+          delete revMap[matchingUnique.id];
+          delete revMap[matchingUnique.canonicalKey];
+        }
+        localStorage.setItem('prep_revision_added_map', JSON.stringify(revMap));
+      }
+    } catch (e) {
+      // Ignore cache parse error
     }
 
-    // If stored in problems list, remove from problemStore via API
-    if (problem.id && !problem.id.startsWith('curated_')) {
+    // 3. Remove from problem store & React state via deleteProblem
+    const matchingInAll = (allProblems || []).find(p => 
+      p.id === problem.id || 
+      (problem.title && p.title?.toLowerCase() === problem.title?.toLowerCase()) ||
+      (canonKey && getCanonicalKey(p) === canonKey)
+    );
+
+    if (matchingInAll?.id) {
+      await deleteProblem(matchingInAll.id);
+    } else if (problem.id) {
       await deleteProblem(problem.id);
     }
   };
@@ -803,6 +849,7 @@ export function DSA({ dsaHook }) {
             sheetId={selectedSheetId}
             onBack={() => setSelectedSheetId(null)} 
             onAddProblem={addProblem} 
+            onDeleteProblem={deleteProblem}
           />
         ) : (
           <div className="space-y-4">

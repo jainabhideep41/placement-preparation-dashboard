@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { 
   Award, 
   Sparkles, 
@@ -77,6 +78,7 @@ export const CALIBRATED_ROLES = [
 
 export function PlacementReadiness({ dashboardData, onNavigate }) {
   const [currentUser, setCurrentUser] = useLocalCache('prep_auth_user', null);
+  const location = useLocation();
   const readiness = dashboardData?.readiness || {};
   const breakdown = readiness.breakdown || {};
 
@@ -91,6 +93,17 @@ export function PlacementReadiness({ dashboardData, onNavigate }) {
 
   // Interactive calibrated weights state
   const [weights, setWeights] = useState(initialRole.weights);
+
+  // Sync incoming role from Universal Search
+  useEffect(() => {
+    if (location.state?.roleId) {
+      const match = CALIBRATED_ROLES.find(r => r.id === location.state.roleId);
+      if (match) {
+        setSelectedRole(match.id);
+        setWeights(match.weights);
+      }
+    }
+  }, [location.state]);
 
   const activeRoleConfig = CALIBRATED_ROLES.find(r => r.id === selectedRole) || CALIBRATED_ROLES[0];
 

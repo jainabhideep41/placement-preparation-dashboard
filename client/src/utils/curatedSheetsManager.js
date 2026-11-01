@@ -23,17 +23,18 @@ export const CANONICAL_STORAGE_KEY = 'prep_curated_canonical_solved_map';
  */
 export function getCanonicalKey(p) {
   if (!p) return '';
-  if (p.problemUrl) {
-    const lcMatch = p.problemUrl.match(/leetcode\.com\/problems\/([^/?#]+)/i);
+  const url = p.problemUrl || p.url;
+  if (url) {
+    const lcMatch = url.match(/leetcode\.com\/problems\/([^/?#]+)/i);
     if (lcMatch) return 'lc:' + lcMatch[1].toLowerCase().replace(/\/$/, '');
 
-    const cfMatch = p.problemUrl.match(/codeforces\.com\/problemset\/problem\/([0-9]+)\/([A-Za-z0-9]+)/i);
+    const cfMatch = url.match(/codeforces\.com\/problemset\/problem\/([0-9]+)\/([A-Za-z0-9]+)/i);
     if (cfMatch) return 'cf:' + cfMatch[1] + '-' + cfMatch[2].toLowerCase();
 
-    const cnMatch = p.problemUrl.match(/codingninjas\.com\/.*\/([a-z0-9-]+)(?:_|\?|$)/i);
+    const cnMatch = url.match(/codingninjas\.com\/.*\/([a-z0-9-]+)(?:_|\?|$)/i);
     if (cnMatch) return 'cn:' + cnMatch[1].toLowerCase();
 
-    const gfgMatch = p.problemUrl.match(/geeksforgeeks\.org\/problems\/([^/?#]+)/i);
+    const gfgMatch = url.match(/geeksforgeeks\.org\/problems\/([^/?#]+)/i);
     if (gfgMatch) return 'gfg:' + gfgMatch[1].toLowerCase();
   }
   // Fallback to normalized alphanumeric title

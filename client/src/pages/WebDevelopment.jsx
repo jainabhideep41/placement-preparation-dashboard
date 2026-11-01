@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { 
   Globe2, 
   CheckCircle2, 
@@ -33,11 +34,25 @@ import { webDevRoadmaps, webDevProjects } from '../data/webDevData';
 
 export function WebDevelopment({ progressHook }) {
   const { webDevData, loading, toggleWebDevMilestone } = progressHook;
+  const location = useLocation();
   const [activeTab, setActiveTab] = useState('roadmaps'); // 'roadmaps' | 'projects' | 'cheatsheet'
   const [selectedRoadmap, setSelectedRoadmap] = useState('frontend');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTag, setSelectedTag] = useState('All');
   const [showAddProjectModal, setShowAddProjectModal] = useState(false);
+
+  // Sync incoming state from Universal Search
+  useEffect(() => {
+    if (location.state?.tab) {
+      setActiveTab(location.state.tab);
+    }
+    if (location.state?.roadmapId) {
+      setSelectedRoadmap(location.state.roadmapId);
+    }
+    if (location.state?.search) {
+      setSearchQuery(location.state.search);
+    }
+  }, [location.state]);
 
   // Study Reader Modal State
   const [readerData, setReaderData] = useState(null);

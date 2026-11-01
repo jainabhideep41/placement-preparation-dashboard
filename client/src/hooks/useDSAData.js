@@ -46,6 +46,7 @@ export function useDSAData() {
   }, [fetchDSA]);
 
   const addProblem = async (newProblem) => {
+    let createdProb = null;
     try {
       const res = await fetch('/api/dsa/problems', {
         method: 'POST',
@@ -55,28 +56,38 @@ export function useDSAData() {
       if (res.ok) {
         const json = await res.json();
         if (json.problem) {
-          setProblems(prev => [json.problem, ...prev]);
-          return json.problem;
+          createdProb = json.problem;
         }
       }
     } catch (e) {
       // Offline fallback
-      const localProb = {
+    }
+
+    if (!createdProb) {
+      createdProb = {
         ...newProblem,
         id: `p_${Date.now()}`,
         status: 'Solved',
         revisionStatus: 'Due',
         lastReviewed: new Date().toISOString().split('T')[0]
       };
-      setProblems(prev => [localProb, ...prev]);
-      return localProb;
     }
+
+    setProblems(prev => {
+      const updated = [createdProb, ...prev.filter(p => p.id !== createdProb.id)];
+      setCachedDSA(prevCached => prevCached ? { ...prevCached, problems: updated } : { success: true, problems: updated });
+      return updated;
+    });
+
+    return createdProb;
   };
 
   const updateProblem = async (id, updates) => {
-    setProblems(prev =>
-      prev.map(p => (p.id === id ? { ...p, ...updates } : p))
-    );
+    setProblems(prev => {
+      const updated = prev.map(p => (p.id === id ? { ...p, ...updates } : p));
+      setCachedDSA(prevCached => prevCached ? { ...prevCached, problems: updated } : null);
+      return updated;
+    });
 
     try {
       await fetch(`/api/dsa/problems/${id}`, {
@@ -90,10 +101,19 @@ export function useDSAData() {
   };
 
   const deleteProblem = async (id) => {
-    setProblems(prev => prev.filter(p => p.id !== id));
+    const idLower = String(id).toLowerCase();
+    setProblems(prev => {
+      const updated = prev.filter(p => 
+        p.id !== id && 
+        p.canonicalKey !== id && 
+        p.title?.toLowerCase() !== idLower
+      );
+      setCachedDSA(prevCached => prevCached ? { ...prevCached, problems: updated } : null);
+      return updated;
+    });
 
     try {
-      await fetch(`/api/dsa/problems/${id}`, {
+      await fetch(`/api/dsa/problems/${encodeURIComponent(id)}`, {
         method: 'DELETE'
       });
     } catch (e) {

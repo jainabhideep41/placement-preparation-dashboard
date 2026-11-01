@@ -29,8 +29,14 @@ export function getDueProblems() {
   return storedProblems.filter(p => p.revisionStatus === 'Due');
 }
 
-export function deleteProblemFromStore(id) {
-  const index = storedProblems.findIndex(p => p.id === id);
+export function deleteProblemFromStore(idOrKey) {
+  if (!idOrKey) return false;
+  const keyLower = String(idOrKey).toLowerCase();
+  const index = storedProblems.findIndex(p => 
+    p.id === idOrKey || 
+    p.canonicalKey === idOrKey || 
+    p.title?.toLowerCase() === keyLower
+  );
   if (index === -1) return false;
   storedProblems.splice(index, 1);
   return true;

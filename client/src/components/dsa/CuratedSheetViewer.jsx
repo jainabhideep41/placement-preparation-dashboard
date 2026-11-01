@@ -87,13 +87,13 @@ export const SHEET_REGISTRY = {
   }
 };
 
-export function CuratedSheetViewer({ sheetId = 'striver_sde', onBack, onAddProblem }) {
+export function CuratedSheetViewer({ sheetId = 'striver_sde', onBack, onAddProblem, onDeleteProblem }) {
   const currentSheet = SHEET_REGISTRY[sheetId] || SHEET_REGISTRY.striver_sde;
   const rawProblems = currentSheet.problems;
 
   // Global Canonical Solved Map across all sheets
   const [canonicalSolvedMap, setCanonicalSolvedMap] = useLocalCache(CANONICAL_STORAGE_KEY, {});
-  const [revisionAddedMap, setRevisionAddedMap] = useState({});
+  const [revisionAddedMap, setRevisionAddedMap] = useLocalCache('prep_revision_added_map', {});
 
   // Migrate any previous local storage caches on initial mount
   useEffect(() => {
@@ -151,28 +151,52 @@ export function CuratedSheetViewer({ sheetId = 'striver_sde', onBack, onAddProbl
     setCanonicalSolvedMap(prev => toggleCanonicalSolvedState(problem, prev));
   };
 
-  // Add to spaced repetition revision queue
-  const handleAddToRevision = async (problem, e) => {
+  // Add or remove from spaced repetition revision queue
+  const handleToggleRevision = async (problem, e) => {
     e?.stopPropagation();
-    if (onAddProblem) {
-      const notesContext = problem.day 
-        ? `Imported from ${currentSheet.title} (Day ${problem.day})` 
-        : problem.rating 
-        ? `Imported from ${currentSheet.title} (Rating ${problem.rating})` 
-        : `Imported from ${currentSheet.title} (${problem.topic})`;
+    const canonKey = getCanonicalKey(problem);
+    const key = problem.id || canonKey;
+    const isCurrentlyAdded = Boolean(revisionAddedMap[key] || revisionAddedMap[canonKey] || (problem.canonicalKey && revisionAddedMap[problem.canonicalKey]));
 
-      await onAddProblem({
-        title: problem.title,
-        platform: problem.platform,
-        difficulty: problem.difficulty,
-        topic: problem.topic,
-        url: problem.problemUrl,
-        notes: notesContext,
-        revisionInterval: '7d'
+    if (isCurrentlyAdded) {
+      setRevisionAddedMap(prev => {
+        const next = { ...prev };
+        delete next[key];
+        delete next[canonKey];
+        if (problem.canonicalKey) delete next[problem.canonicalKey];
+        if (problem.id) delete next[problem.id];
+        return next;
       });
-      setRevisionAddedMap(prev => ({ ...prev, [problem.id || getCanonicalKey(problem)]: true }));
+      if (onDeleteProblem) {
+        await onDeleteProblem(problem.id || canonKey);
+      }
+    } else {
+      if (onAddProblem) {
+        const notesContext = problem.day 
+          ? `Imported from ${currentSheet.title} (Day ${problem.day})` 
+          : problem.rating 
+          ? `Imported from ${currentSheet.title} (Rating ${problem.rating})` 
+          : `Imported from ${currentSheet.title} (${problem.topic})`;
+
+        await onAddProblem({
+          title: problem.title,
+          platform: problem.platform,
+          difficulty: problem.difficulty,
+          topic: problem.topic,
+          url: problem.problemUrl,
+          notes: notesContext,
+          revisionInterval: '7d'
+        });
+        setRevisionAddedMap(prev => ({ 
+          ...prev, 
+          [key]: true,
+          [canonKey]: true,
+          ...(problem.canonicalKey ? { [problem.canonicalKey]: true } : {})
+        }));
+      }
     }
   };
+  const handleAddToRevision = handleToggleRevision;
 
   // Compute overall metrics
   const totalCount = rawProblems.length;
@@ -622,12 +646,16 @@ export function CuratedSheetViewer({ sheetId = 'striver_sde', onBack, onAddProbl
                 {isExpanded && (
                   <div className="divide-y divide-gray-100">
                     {group.problems.map((problem) => {
+                      const canonKey = getCanonicalKey(problem);
                       const isSolved = isProblemSolved(problem, canonicalSolvedMap);
-                      const isRevAdded = Boolean(revisionAddedMap[problem.id || getCanonicalKey(problem)]);
+                      const isRevAdded = Boolean(
+                        revisionAddedMap[problem.id] || 
+                        revisionAddedMap[canonKey] || 
+                        (problem.canonicalKey && revisionAddedMap[problem.canonicalKey])
+                      );
                       const platInfo = getPlatformBadge(problem.platform);
                       
                       // Check other sheets that also have this problem
-                      const canonKey = getCanonicalKey(problem);
                       const sharedRefs = CANONICAL_TO_SHEETS_MAP[canonKey] || [];
                       const otherSheets = sharedRefs.filter(ref => ref.sheetId !== currentSheet.id);
 
@@ -725,16 +753,15 @@ export function CuratedSheetViewer({ sheetId = 'striver_sde', onBack, onAddProbl
                               </a>
                             )}
 
-                            {/* Add to Revision */}
+                            {/* Add / Untrack Revision */}
                             <button
-                              onClick={(e) => handleAddToRevision(problem, e)}
-                              disabled={isRevAdded}
+                              onClick={(e) => handleToggleRevision(problem, e)}
                               className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-[11px] font-medium transition-colors ${
                                 isRevAdded
-                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200 cursor-default'
+                                  ? 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200'
                                   : 'bg-white hover:bg-gray-50 text-gray-600 hover:text-black border-gray-200'
                               }`}
-                              title="Add problem to Spaced Repetition Revision queue"
+                              title={isRevAdded ? "Tracked in Revision Suite — click to untrack" : "Add problem to Spaced Repetition Revision queue"}
                             >
                               {isRevAdded ? (
                                 <>
