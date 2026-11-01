@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useLocalCache } from '../hooks/useLocalCache';
 import { Badge } from '../components/common/Badge';
+import { saveUserToRegistry } from '../utils/accountManager';
 
 export function Settings({ onRefreshAll }) {
   const [currentUser] = useLocalCache('prep_auth_user', null);
@@ -78,11 +79,30 @@ export function Settings({ onRefreshAll }) {
   const handleSaveHandles = async (e) => {
     if (e) e.preventDefault();
     setSyncing(true);
-    setHandles({
+    const newHandles = {
       codeforces: cfInput.trim(),
       leetcode: lcInput.trim(),
       github: ghInput.trim()
-    });
+    };
+    setHandles(newHandles);
+
+    if (currentUser?.email) {
+      saveUserToRegistry({
+        ...currentUser,
+        handles: newHandles
+      });
+
+      fetch('/api/auth/complete-onboarding', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: currentUser.email,
+          handles: newHandles,
+          targetRole: currentUser.targetRole
+        })
+      }).catch(() => {});
+    }
+
     setSavedSuccess(true);
     if (onRefreshAll) await onRefreshAll();
     setSyncing(false);
@@ -93,7 +113,26 @@ export function Settings({ onRefreshAll }) {
     setCfInput(cf);
     setLcInput(lc);
     setGhInput(gh);
-    setHandles({ codeforces: cf, leetcode: lc, github: gh });
+    const presetHandles = { codeforces: cf, leetcode: lc, github: gh };
+    setHandles(presetHandles);
+
+    if (currentUser?.email) {
+      saveUserToRegistry({
+        ...currentUser,
+        handles: presetHandles
+      });
+
+      fetch('/api/auth/complete-onboarding', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: currentUser.email,
+          handles: presetHandles,
+          targetRole: currentUser.targetRole
+        })
+      }).catch(() => {});
+    }
+
     setSavedSuccess(true);
     if (onRefreshAll) await onRefreshAll();
     setTimeout(() => setSavedSuccess(false), 3000);

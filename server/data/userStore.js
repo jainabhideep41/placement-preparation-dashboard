@@ -1,9 +1,47 @@
 /**
- * In-Memory User Store for Unified Multi-Provider Authentication
+ * Persistent User Store for Unified Multi-Provider Authentication
  * Users are indexed strictly by lowercase email to ensure unified accounts across Google, GitHub, and Password.
+ * Persists to disk (/tmp in serverless environments, local root in dev).
  */
 
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
+
 const usersByEmail = new Map();
+
+// Determine writable file path (/tmp on Vercel AWS Lambda, system temp in development to prevent watch restarts)
+const STORAGE_FILE = path.join(os.tmpdir(), 'prepstack_users.json');
+
+function loadUsersFromDisk() {
+  try {
+    if (fs.existsSync(STORAGE_FILE)) {
+      const raw = fs.readFileSync(STORAGE_FILE, 'utf8');
+      const data = JSON.parse(raw);
+      if (Array.isArray(data)) {
+        for (const u of data) {
+          if (u && u.email) {
+            usersByEmail.set(normalizeEmail(u.email), u);
+          }
+        }
+      }
+    }
+  } catch (e) {
+    // Non-blocking fallback
+  }
+}
+
+function persistUsersToDisk() {
+  try {
+    const list = Array.from(usersByEmail.values());
+    fs.writeFileSync(STORAGE_FILE, JSON.stringify(list, null, 2), 'utf8');
+  } catch (e) {
+    // Non-blocking fallback
+  }
+}
+
+// Initial hydration from disk
+loadUsersFromDisk();
 
 /**
  * Normalizes email for consistent lookup
@@ -18,6 +56,9 @@ export function normalizeEmail(email) {
  */
 export function getUserByEmail(email) {
   const key = normalizeEmail(email);
+  if (!usersByEmail.has(key)) {
+    loadUsersFromDisk();
+  }
   return usersByEmail.get(key) || null;
 }
 
@@ -29,6 +70,7 @@ export function saveOrMergeUser(userData) {
   const emailKey = normalizeEmail(userData.email);
   if (!emailKey) return null;
 
+  loadUsersFromDisk();
   const existing = usersByEmail.get(emailKey);
 
   if (existing) {
@@ -60,6 +102,7 @@ export function saveOrMergeUser(userData) {
     };
 
     usersByEmail.set(emailKey, mergedUser);
+    persistUsersToDisk();
     return mergedUser;
   }
 
@@ -86,6 +129,7 @@ export function saveOrMergeUser(userData) {
   };
 
   usersByEmail.set(emailKey, newUser);
+  persistUsersToDisk();
   return newUser;
 }
 
@@ -94,12 +138,14 @@ export function saveOrMergeUser(userData) {
  */
 export function updateUserPassword(email, newPassword) {
   const key = normalizeEmail(email);
+  loadUsersFromDisk();
   const user = usersByEmail.get(key);
   if (!user) return null;
 
   user.password = newPassword;
   user.lastPasswordResetAt = new Date().toISOString();
   usersByEmail.set(key, user);
+  persistUsersToDisk();
   return user;
 }
 
@@ -108,10 +154,12 @@ export function updateUserPassword(email, newPassword) {
  */
 export function markWelcomeEmailSent(email) {
   const key = normalizeEmail(email);
+  loadUsersFromDisk();
   const user = usersByEmail.get(key);
   if (user) {
     user.welcomeEmailSent = true;
     usersByEmail.set(key, user);
+    persistUsersToDisk();
   }
 }
 
@@ -120,10 +168,12 @@ export function markWelcomeEmailSent(email) {
  */
 export function markEmailVerified(email) {
   const key = normalizeEmail(email);
+  loadUsersFromDisk();
   const user = usersByEmail.get(key);
   if (user) {
     user.emailVerified = true;
     usersByEmail.set(key, user);
+    persistUsersToDisk();
     return user;
   }
   return null;
@@ -134,6 +184,7 @@ export function markEmailVerified(email) {
  */
 export function completeUserOnboarding(email, handles = {}, targetRole) {
   const key = normalizeEmail(email);
+  loadUsersFromDisk();
   const user = usersByEmail.get(key);
   if (!user) return null;
 
@@ -147,5 +198,6 @@ export function completeUserOnboarding(email, handles = {}, targetRole) {
   user.lastLoginAt = new Date().toISOString();
 
   usersByEmail.set(key, user);
+  persistUsersToDisk();
   return user;
 }

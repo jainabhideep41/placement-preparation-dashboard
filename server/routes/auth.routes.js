@@ -1,4 +1,5 @@
 import express from 'express';
+import crypto from 'crypto';
 import { 
   getUserByEmail, 
   saveOrMergeUser, 
@@ -14,6 +15,24 @@ import {
 } from '../services/email.service.js';
 
 const router = express.Router();
+
+const AUTH_HMAC_SECRET = process.env.AUTH_SECRET || 'prepstack_auth_hmac_secret_2026';
+
+export function generateVerificationToken(email, code, expiresAt) {
+  const payload = `${email.toLowerCase()}:${code.trim()}:${expiresAt}`;
+  const sig = crypto.createHmac('sha256', AUTH_HMAC_SECRET).update(payload).digest('hex');
+  return `${expiresAt}.${sig}`;
+}
+
+export function verifyVerificationToken(email, code, verificationToken) {
+  if (!verificationToken || typeof verificationToken !== 'string' || !verificationToken.includes('.')) return false;
+  const [expiresAtStr, sig] = verificationToken.split('.');
+  const expiresAt = Number(expiresAtStr);
+  if (!expiresAt || Date.now() > expiresAt) return false;
+  const payload = `${email.toLowerCase()}:${code.trim()}:${expiresAt}`;
+  const expectedSig = crypto.createHmac('sha256', AUTH_HMAC_SECRET).update(payload).digest('hex');
+  return sig === expectedSig;
+}
 
 function getBaseUrl(req) {
   if (process.env.SERVER_URL) return process.env.SERVER_URL.replace(/\/$/, '');
@@ -411,6 +430,7 @@ router.post('/register-request', async (req, res) => {
 
   const code = Math.floor(100000 + Math.random() * 900000).toString();
   const expiresAt = now + 15 * 60 * 1000; // 15 minutes
+  const verificationToken = generateVerificationToken(cleanEmail, code, expiresAt);
 
   registrationCodes.set(cleanEmail, {
     code,
@@ -435,6 +455,8 @@ router.post('/register-request', async (req, res) => {
       : `Verification code generated for ${cleanEmail}. Resend sandbox mode active.`,
     cooldownSeconds: 30,
     testOtp: code,
+    verificationToken,
+    expiresAt,
     sandboxMode: !emailResult.delivered,
     forwardedToOwner: Boolean(emailResult.forwardedToOwner),
     emailResult
@@ -446,7 +468,7 @@ router.post('/register-request', async (req, res) => {
  * Step 2: Verifies code, creates unified account, sends Welcome Email, and logs student in
  */
 router.post('/verify-registration', async (req, res) => {
-  const { email, code } = req.body;
+  const { email, code, verificationToken, regData: clientRegData } = req.body;
 
   if (!email || !code) {
     return res.status(400).json({ success: false, message: 'Email and verification code are required' });
@@ -455,30 +477,39 @@ router.post('/verify-registration', async (req, res) => {
   const cleanEmail = email.trim().toLowerCase();
   const entry = registrationCodes.get(cleanEmail);
 
-  if (!entry) {
-    return res.status(400).json({
-      success: false,
-      message: 'No verification code requested for this email, or code expired. Please request a new code.'
-    });
+  let isValid = false;
+  let regData = clientRegData || {};
+
+  if (entry) {
+    if (Date.now() > entry.expiresAt) {
+      registrationCodes.delete(cleanEmail);
+      return res.status(400).json({
+        success: false,
+        message: 'Verification code has expired. Please request a new one.'
+      });
+    }
+    if (entry.code === code.trim()) {
+      isValid = true;
+      regData = { ...(entry.data || {}), ...regData };
+      registrationCodes.delete(cleanEmail);
+    }
   }
 
-  if (Date.now() > entry.expiresAt) {
-    registrationCodes.delete(cleanEmail);
-    return res.status(400).json({
-      success: false,
-      message: 'Verification code has expired. Please request a new one.'
-    });
+  // Stateless fallback verification for serverless (Vercel / Lambda) cold-starts
+  if (!isValid && verificationToken) {
+    if (verifyVerificationToken(cleanEmail, code, verificationToken)) {
+      isValid = true;
+    }
   }
 
-  if (entry.code !== code.trim()) {
+  if (!isValid) {
     return res.status(400).json({
       success: false,
-      message: 'Invalid verification code. Please check your email and try again.'
+      message: 'Invalid or expired verification code. Please check your email and try again.'
     });
   }
 
   // Code verified! Create/merge the user
-  const regData = entry.data || {};
   const user = saveOrMergeUser({
     email: cleanEmail,
     name: regData.name || cleanEmail.split('@')[0],
@@ -490,9 +521,6 @@ router.post('/verify-registration', async (req, res) => {
     welcomeEmailSent: true,
     onboardingCompleted: true
   });
-
-  // Clean up registration code
-  registrationCodes.delete(cleanEmail);
 
   // Send Welcome Email
   sendWelcomeEmail({
@@ -536,6 +564,7 @@ router.post('/forgot-password-request', async (req, res) => {
   const user = getUserByEmail(cleanEmail);
   const code = Math.floor(100000 + Math.random() * 900000).toString();
   const expiresAt = now + 15 * 60 * 1000; // 15 mins
+  const verificationToken = generateVerificationToken(cleanEmail, code, expiresAt);
 
   passwordResetCodes.set(cleanEmail, {
     code,
@@ -559,6 +588,8 @@ router.post('/forgot-password-request', async (req, res) => {
       : `Password reset code generated for ${cleanEmail}. Resend sandbox mode active.`,
     cooldownSeconds: 30,
     testOtp: code,
+    verificationToken,
+    expiresAt,
     sandboxMode: !emailResult.delivered,
     forwardedToOwner: Boolean(emailResult.forwardedToOwner),
     emailResult
@@ -570,7 +601,7 @@ router.post('/forgot-password-request', async (req, res) => {
  * Step 2: Verifies reset code and updates the user's password
  */
 router.post('/reset-password', (req, res) => {
-  const { email, code, newPassword } = req.body;
+  const { email, code, newPassword, verificationToken } = req.body;
 
   if (!email || !code || !newPassword) {
     return res.status(400).json({
@@ -589,22 +620,30 @@ router.post('/reset-password', (req, res) => {
   const cleanEmail = email.trim().toLowerCase();
   const entry = passwordResetCodes.get(cleanEmail);
 
-  if (!entry) {
-    return res.status(400).json({
-      success: false,
-      message: 'No active password reset request found. Please request a new code.'
-    });
+  let isValid = false;
+
+  if (entry) {
+    if (Date.now() > entry.expiresAt) {
+      passwordResetCodes.delete(cleanEmail);
+      return res.status(400).json({
+        success: false,
+        message: 'Password reset code has expired. Please request a new one.'
+      });
+    }
+    if (entry.code === code.trim()) {
+      isValid = true;
+      passwordResetCodes.delete(cleanEmail);
+    }
   }
 
-  if (Date.now() > entry.expiresAt) {
-    passwordResetCodes.delete(cleanEmail);
-    return res.status(400).json({
-      success: false,
-      message: 'Password reset code has expired. Please request a new one.'
-    });
+  // Stateless fallback verification
+  if (!isValid && verificationToken) {
+    if (verifyVerificationToken(cleanEmail, code, verificationToken)) {
+      isValid = true;
+    }
   }
 
-  if (entry.code !== code.trim()) {
+  if (!isValid) {
     return res.status(400).json({
       success: false,
       message: 'Invalid verification code. Please check and try again.'
@@ -620,8 +659,6 @@ router.post('/reset-password', (req, res) => {
       emailVerified: true
     });
   }
-
-  passwordResetCodes.delete(cleanEmail);
 
   console.log(`[Auth Password Reset] Password updated for ${cleanEmail}`);
 
@@ -659,6 +696,7 @@ router.post('/resend-verification', async (req, res) => {
 
   const code = Math.floor(100000 + Math.random() * 900000).toString();
   const expiresAt = now + 15 * 60 * 1000;
+  const verificationToken = generateVerificationToken(cleanEmail, code, expiresAt);
 
   codeMap.set(cleanEmail, {
     ...(existing || {}),
@@ -686,6 +724,8 @@ router.post('/resend-verification', async (req, res) => {
       : `Verification code generated for ${cleanEmail}. Resend sandbox mode active.`,
     cooldownSeconds: 30,
     testOtp: code,
+    verificationToken,
+    expiresAt,
     sandboxMode: !emailResult?.delivered,
     forwardedToOwner: Boolean(emailResult?.forwardedToOwner),
     emailResult

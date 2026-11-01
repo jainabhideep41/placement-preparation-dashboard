@@ -78,6 +78,7 @@ export function Login({ onLogin }) {
   const [regCooldown, setRegCooldown] = useState(0);
   const [testOtpNotice, setTestOtpNotice] = useState('');
   const [deliveryMode, setDeliveryMode] = useState('');
+  const [regVerificationToken, setRegVerificationToken] = useState('');
 
   // Forgot Password Modal State
   const [showForgotModal, setShowForgotModal] = useState(false);
@@ -91,6 +92,7 @@ export function Login({ onLogin }) {
   const [forgotSuccess, setForgotSuccess] = useState('');
   const [forgotCooldown, setForgotCooldown] = useState(0);
   const [forgotTestOtp, setForgotTestOtp] = useState('');
+  const [forgotVerificationToken, setForgotVerificationToken] = useState('');
 
   // Resend Email Modal State
   const [showResendModal, setShowResendModal] = useState(false);
@@ -273,6 +275,9 @@ export function Login({ onLogin }) {
       if (res.ok && data.success) {
         setRegCooldown(data.cooldownSeconds || 30);
         setTestOtpNotice(data.testOtp || '');
+        if (data.verificationToken) {
+          setRegVerificationToken(data.verificationToken);
+        }
         setDeliveryMode(data.emailResult?.mode || (data.sandboxMode ? 'sandbox' : 'smtp'));
         if (data.testOtp) {
           setRegVerifyCode(data.testOtp);
@@ -317,7 +322,18 @@ export function Login({ onLogin }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: cleanEmail,
-          code: regVerifyCode.trim()
+          code: regVerifyCode.trim(),
+          verificationToken: regVerificationToken,
+          regData: {
+            name: name.trim() || cleanEmail.split('@')[0],
+            password,
+            handles: {
+              leetcode: leetcodeHandle.trim(),
+              codeforces: codeforcesHandle.trim(),
+              github: githubHandle.trim()
+            },
+            targetRole
+          }
         })
       });
 
@@ -385,6 +401,9 @@ export function Login({ onLogin }) {
       if (res.ok && data.success) {
         setRegCooldown(data.cooldownSeconds || 30);
         setTestOtpNotice(data.testOtp || '');
+        if (data.verificationToken) {
+          setRegVerificationToken(data.verificationToken);
+        }
         if (data.testOtp) {
           setRegVerifyCode(data.testOtp);
         }
@@ -426,6 +445,9 @@ export function Login({ onLogin }) {
       if (res.ok && data.success) {
         setForgotCooldown(data.cooldownSeconds || 30);
         setForgotTestOtp(data.testOtp || '');
+        if (data.verificationToken) {
+          setForgotVerificationToken(data.verificationToken);
+        }
         if (data.sandboxMode || !data.emailResult?.delivered) {
           setForgotCode(data.testOtp || '');
           setForgotSuccess(`Sandbox mode: Reset code auto-filled [${data.testOtp}]`);
@@ -473,7 +495,8 @@ export function Login({ onLogin }) {
         body: JSON.stringify({
           email: targetEmail,
           code: forgotCode.trim(),
-          newPassword
+          newPassword,
+          verificationToken: forgotVerificationToken
         })
       });
 
@@ -530,6 +553,13 @@ export function Login({ onLogin }) {
 
       const data = await res.json();
       if (res.ok && data.success) {
+        if (data.verificationToken) {
+          if (resendType === 'register') {
+            setRegVerificationToken(data.verificationToken);
+          } else {
+            setForgotVerificationToken(data.verificationToken);
+          }
+        }
         setResendMessage(
           data.emailResult?.delivered
             ? `Verification email delivered to ${targetEmail}!`
