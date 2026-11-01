@@ -1,7 +1,6 @@
 # PREPSTACK — Placement Preparation & Developer Portfolio Platform
 
-> **Academic Basis:** Topic 7: *Placement Preparation Dashboard*  
-> **Course:** Lab Based Mini Projects 2026 – Full Stack Development II  
+
 > **Required Technologies:** Computer, VS Code, Node.js, React.js, React Hooks  
 > **Core Objectives:** Component-based dashboard design, progress tracking, and conditional rendering.
 
