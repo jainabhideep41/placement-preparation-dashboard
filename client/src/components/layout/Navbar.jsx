@@ -195,7 +195,7 @@ export function Navbar({
 
         {/* Public Profile View Link */}
         <Link
-          to="/u"
+          to={`/u/${encodeURIComponent(currentUser?.username || currentUser?.email?.split('@')[0]?.replace(/[^a-z0-9_-]/gi, '').toLowerCase() || currentUser?.handles?.leetcode || 'demo')}`}
           title="View Your Public Developer Profile"
           className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-mono font-bold bg-white border border-black/20 hover:border-black text-black shadow-xs transition-all hover:bg-neutral-50 active:translate-y-0.5"
         >

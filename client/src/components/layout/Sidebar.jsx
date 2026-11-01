@@ -19,10 +19,17 @@ export function Sidebar({
   onNavigate, 
   isOpen = false, 
   onClose,
-  revisionDueCount = 0 
+  revisionDueCount = 0,
+  currentUser = null
 }) {
   const location = useLocation();
   const currentPath = location.pathname.toLowerCase();
+
+  const userHandle = currentUser?.username || 
+    currentUser?.email?.split('@')[0]?.replace(/[^a-z0-9_-]/gi, '').toLowerCase() || 
+    currentUser?.handles?.leetcode || 
+    'demo';
+  const profilePath = `/u/${encodeURIComponent(userHandle)}`;
 
   const navItems = [
     {
@@ -76,8 +83,8 @@ export function Sidebar({
     },
     {
       id: 'profile',
-      path: '/u',
-      aliases: ['/u', '/profile'],
+      path: profilePath,
+      aliases: ['/u', '/profile', `/u/${userHandle.toLowerCase()}`],
       label: 'Public Profile',
       icon: UserCheck,
       badge: 'Share'

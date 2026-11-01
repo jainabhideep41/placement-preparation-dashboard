@@ -174,8 +174,22 @@ export function App() {
     return <OnboardingModal user={onboardingUser} onComplete={handleCompleteOnboarding} />;
   }
 
+  // Ensure currentUser has a valid sanitized username at all times
+  useEffect(() => {
+    if (currentUser && !currentUser.username && currentUser.email) {
+      const fallbackUsername = currentUser.email.split('@')[0].replace(/[^a-z0-9_-]/gi, '').toLowerCase() || 'candidate';
+      const updatedUser = { ...currentUser, username: fallbackUsername };
+      setCurrentUser(updatedUser);
+      saveUserToRegistry(updatedUser);
+    }
+  }, [currentUser, setCurrentUser]);
+
   // Check if viewing a standalone public profile route
   const isProfileRoute = location.pathname.startsWith('/u') || location.pathname.startsWith('/profile');
+  const userHandle = currentUser?.username || 
+    currentUser?.email?.split('@')[0]?.replace(/[^a-z0-9_-]/gi, '').toLowerCase() || 
+    currentUser?.handles?.leetcode || 
+    'demo';
 
   // If student is not logged in, permit public profile viewing or show Login
   if (!currentUser) {
@@ -183,8 +197,8 @@ export function App() {
       <Routes>
         <Route path="/u/:username" element={<PublicProfile currentUser={null} />} />
         <Route path="/profile/:username" element={<PublicProfile currentUser={null} />} />
-        <Route path="/u" element={<PublicProfile currentUser={null} />} />
-        <Route path="/profile" element={<PublicProfile currentUser={null} />} />
+        <Route path="/u" element={<Navigate to="/u/demo" replace />} />
+        <Route path="/profile" element={<Navigate to="/u/demo" replace />} />
         <Route path="/login" element={<Login onLogin={handleLogin} />} />
         <Route path="*" element={<Login onLogin={handleLogin} />} />
       </Routes>
@@ -197,8 +211,8 @@ export function App() {
       <Routes>
         <Route path="/u/:username" element={<PublicProfile currentUser={currentUser} />} />
         <Route path="/profile/:username" element={<PublicProfile currentUser={currentUser} />} />
-        <Route path="/u" element={<PublicProfile currentUser={currentUser} />} />
-        <Route path="/profile" element={<PublicProfile currentUser={currentUser} />} />
+        <Route path="/u" element={<Navigate to={`/u/${encodeURIComponent(userHandle)}`} replace />} />
+        <Route path="/profile" element={<Navigate to={`/u/${encodeURIComponent(userHandle)}`} replace />} />
       </Routes>
     );
   }
@@ -228,6 +242,7 @@ export function App() {
           isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
           revisionDueCount={dsaHook.dueRevisionCount}
+          currentUser={currentUser}
         />
 
         {/* Main Content Area with Real URL Routes */}

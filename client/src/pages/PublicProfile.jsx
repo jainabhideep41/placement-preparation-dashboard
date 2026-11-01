@@ -40,13 +40,19 @@ export function PublicProfile({ currentUser }) {
 
   // Determine target identifier from path /u/:username or query /u?user=:username
   const queryParam = searchParams.get('user') || searchParams.get('u') || searchParams.get('handle') || searchParams.get('id');
-  const resolvedIdentifier = username || 
-    queryParam ||
-    currentUser?.username ||
+  const targetUsername = currentUser?.username || 
+    currentUser?.email?.split('@')[0]?.replace(/[^a-z0-9_-]/gi, '').toLowerCase() || 
     currentUser?.handles?.leetcode || 
-    currentUser?.handles?.github || 
-    currentUser?.name || 
-    'demo';
+    currentUser?.handles?.github;
+
+  const resolvedIdentifier = (username || queryParam || targetUsername || 'demo').replace(/[^a-z0-9_-]/gi, '').toLowerCase();
+
+  // If user navigated to /u or /profile without username in path, normalize route to /u/:username immediately
+  useEffect(() => {
+    if (!username && resolvedIdentifier && resolvedIdentifier !== 'demo') {
+      navigate(`/u/${encodeURIComponent(resolvedIdentifier)}`, { replace: true });
+    }
+  }, [username, resolvedIdentifier, navigate]);
 
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -198,10 +204,14 @@ export function PublicProfile({ currentUser }) {
     };
   }, [resolvedIdentifier]);
 
+  const canonicalUsername = (profile?.identifier || username || resolvedIdentifier || 'demo').replace(/[^a-z0-9_-]/gi, '').toLowerCase();
+  const canonicalShareUrl = typeof window !== 'undefined'
+    ? `${window.location.origin}/u/${encodeURIComponent(canonicalUsername)}`
+    : `/u/${canonicalUsername}`;
+
   const handleShare = () => {
-    const url = window.location.href;
     if (navigator.clipboard) {
-      navigator.clipboard.writeText(url).then(() => {
+      navigator.clipboard.writeText(canonicalShareUrl).then(() => {
         setCopied(true);
         setTimeout(() => setCopied(false), 2500);
       });
@@ -293,6 +303,35 @@ export function PublicProfile({ currentUser }) {
         </div>
       </nav>
 
+      {/* LeetCode-Style Public Shareable URL Bar */}
+      <div className="bg-[#111] text-white border-b-2 border-black px-4 lg:px-8 py-3 print:hidden shadow-xs">
+        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2.5 overflow-hidden">
+            <span className="font-mono uppercase font-black text-[10px] px-2 py-0.5 rounded bg-emerald-400 text-black border border-emerald-300 shrink-0">
+              Public Link
+            </span>
+            <span className="text-white/70 hidden sm:inline font-mono">Candidate Profile:</span>
+            <div className="flex items-center gap-2 font-mono font-bold bg-neutral-900 px-3 py-1.5 rounded-lg border border-neutral-750 text-white truncate max-w-xl">
+              <Globe className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              <span className="truncate text-emerald-300 font-bold">{canonicalShareUrl}</span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={handleShare}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white text-black hover:bg-neutral-100 rounded-lg font-mono text-xs font-bold transition-all shadow-[2px_2px_0px_0px_#444] active:translate-x-0.5 active:translate-y-0.5 cursor-pointer"
+            >
+              {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+              <span>{copied ? 'Copied Public Link!' : 'Copy Shareable Link'}</span>
+            </button>
+            <span className="text-[11px] font-mono text-neutral-400 hidden lg:inline">
+              (Publicly viewable by anyone without signing in)
+            </span>
+          </div>
+        </div>
+      </div>
+
       {/* Main Container */}
       <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 space-y-6">
         {/* Header Hero Card */}
@@ -320,9 +359,17 @@ export function PublicProfile({ currentUser }) {
               <div className="space-y-1.5">
                 <div className="flex flex-wrap items-center gap-2">
                   <h1 className="text-2xl sm:text-3xl font-black tracking-tight">{profile.name}</h1>
-                  <span className="font-mono text-xs px-2 py-0.5 bg-neutral-100 border border-black rounded text-neutral-800 font-semibold">
-                    @{profile.identifier}
-                  </span>
+                  <div className="inline-flex items-center gap-1 font-mono text-xs px-2.5 py-1 bg-neutral-100 border-2 border-black rounded-lg text-neutral-900 font-bold shadow-[2px_2px_0px_0px_#000]">
+                    <span className="text-black/50">/u/</span>
+                    <span className="text-black">{canonicalUsername}</span>
+                    <button
+                      onClick={handleShare}
+                      title="Copy Public Profile Link"
+                      className="text-black/60 hover:text-black transition-colors ml-1 cursor-pointer"
+                    >
+                      {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
                   {profile.isRegistered && (
                     <span className="inline-flex items-center gap-1 font-mono text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 bg-emerald-100 text-emerald-900 border border-emerald-700 rounded">
                       <UserCheck className="w-3 h-3 text-emerald-700" />
