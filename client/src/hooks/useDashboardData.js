@@ -16,18 +16,38 @@ export function useDashboardData() {
     github: ''
   });
 
-  const fetchDashboard = useCallback(async (isManualRefresh = false) => {
+  const fetchDashboard = useCallback(async (isManualRefresh = false, overrideHandles = null, overrideRole = null) => {
+    let authUser = null;
+    try {
+      const raw = window.localStorage.getItem('prep_auth_user');
+      if (raw) authUser = JSON.parse(raw);
+    } catch (e) {
+      // ignore
+    }
+
+    const effectiveHandles = {
+      codeforces: overrideHandles?.codeforces !== undefined ? overrideHandles.codeforces : (handles?.codeforces || authUser?.handles?.codeforces || ''),
+      leetcode: overrideHandles?.leetcode !== undefined ? overrideHandles.leetcode : (handles?.leetcode || authUser?.handles?.leetcode || ''),
+      github: overrideHandles?.github !== undefined ? overrideHandles.github : (handles?.github || authUser?.handles?.github || '')
+    };
+    const effectiveRole = overrideRole || authUser?.targetRole || '';
+    const email = authUser?.email || '';
+
     if (isManualRefresh) setRefreshing(true);
     else if (!data) setLoading(true);
 
     setError(null);
 
     try {
-      const query = new URLSearchParams({
-        cf_user: handles.codeforces || '',
-        lc_user: handles.leetcode || '',
-        gh_user: handles.github || ''
-      }).toString();
+      const queryParams = {
+        cf_user: effectiveHandles.codeforces,
+        lc_user: effectiveHandles.leetcode,
+        gh_user: effectiveHandles.github
+      };
+      if (email) queryParams.email = email;
+      if (effectiveRole) queryParams.role = effectiveRole;
+
+      const query = new URLSearchParams(queryParams).toString();
 
       const res = await fetch(`/api/dashboard?${query}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}: Failed to fetch dashboard data`);
@@ -53,7 +73,7 @@ export function useDashboardData() {
     fetchDashboard();
   }, [fetchDashboard]);
 
-  const refresh = () => fetchDashboard(true);
+  const refresh = (overrideHandles = null, overrideRole = null) => fetchDashboard(true, overrideHandles, overrideRole);
 
   return {
     data,

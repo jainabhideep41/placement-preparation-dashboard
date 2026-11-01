@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { defaultDSAData, defaultWebDevData, defaultSystemDesignData } from '../data/seedData.js';
 import { getStoredProblems, getDueProblems } from '../data/problemStore.js';
+import { getUserByEmail } from '../data/userStore.js';
 import { getCodeforcesStats } from '../services/dsa/codeforces.adapter.js';
 import { getLeetCodeStats } from '../services/dsa/leetcode.adapter.js';
 import { getAtCoderStats } from '../services/dsa/atcoder.adapter.js';
@@ -11,7 +12,17 @@ import { calculateReadiness } from '../services/readiness.service.js';
 const router = Router();
 
 router.get('/', async (req, res) => {
-  const { cf_user = '', lc_user = '', gh_user = '', ac_user = '', hr_user = '', role = '', targetRole = '' } = req.query;
+  let { cf_user = '', lc_user = '', gh_user = '', ac_user = '', hr_user = '', role = '', targetRole = '', email = '' } = req.query;
+
+  if (email) {
+    const registeredUser = getUserByEmail(email);
+    if (registeredUser) {
+      if (!cf_user && registeredUser.handles?.codeforces) cf_user = registeredUser.handles.codeforces;
+      if (!lc_user && registeredUser.handles?.leetcode) lc_user = registeredUser.handles.leetcode;
+      if (!gh_user && registeredUser.handles?.github) gh_user = registeredUser.handles.github;
+      if (!role && !targetRole && registeredUser.targetRole) role = registeredUser.targetRole;
+    }
+  }
 
   try {
     // Concurrent fetch of all platform services (Section 12: Parallel API Requests)

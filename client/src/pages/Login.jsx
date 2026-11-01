@@ -211,13 +211,20 @@ export function Login({ onLogin }) {
           provider: 'email'
         })
       });
-      const data = await res.json();
+      const serverUser = data?.user || {};
+      const mergedHandles = {
+        leetcode: existing?.handles?.leetcode || serverUser?.handles?.leetcode || '',
+        codeforces: existing?.handles?.codeforces || serverUser?.handles?.codeforces || '',
+        github: existing?.handles?.github || serverUser?.handles?.github || ''
+      };
 
       const studentUser = saveUserToRegistry({
+        ...serverUser,
         ...existing,
-        ...(data?.user || {}),
         email: cleanEmail,
-        name: existing?.name || data?.user?.name || cleanEmail.split('@')[0],
+        name: existing?.name || serverUser?.name || cleanEmail.split('@')[0],
+        targetRole: existing?.targetRole || serverUser?.targetRole || 'Software Development Engineer (SDE-1)',
+        handles: mergedHandles,
         onboardingCompleted: true
       });
 
@@ -228,6 +235,11 @@ export function Login({ onLogin }) {
         ...existing,
         email: cleanEmail,
         name: existing?.name || cleanEmail.split('@')[0],
+        handles: {
+          leetcode: existing?.handles?.leetcode || '',
+          codeforces: existing?.handles?.codeforces || '',
+          github: existing?.handles?.github || ''
+        },
         onboardingCompleted: true
       });
       onLogin(studentUser);
@@ -1400,12 +1412,19 @@ export function Login({ onLogin }) {
               onSubmit={(e) => {
                 e.preventDefault();
                 const ghUser = customGhUser.trim() || 'torvalds';
+                const userEmail = (email && email.trim().includes('@')) ? email.trim().toLowerCase() : `${ghUser}@users.noreply.github.com`;
+                const existing = findUserByEmail(userEmail);
                 const student = saveUserToRegistry({
-                  name: ghUser,
-                  email: `${ghUser}@users.noreply.github.com`,
+                  ...existing,
+                  name: existing?.name || ghUser,
+                  email: userEmail,
                   provider: 'github',
-                  avatarUrl: `https://github.com/${encodeURIComponent(ghUser)}.png`,
-                  handles: { leetcode: '', codeforces: '', github: ghUser },
+                  avatarUrl: existing?.avatarUrl || `https://github.com/${encodeURIComponent(ghUser)}.png`,
+                  handles: {
+                    leetcode: existing?.handles?.leetcode || '',
+                    codeforces: existing?.handles?.codeforces || '',
+                    github: existing?.handles?.github || ghUser
+                  },
                   onboardingCompleted: true
                 });
                 setShowGhModal(false);

@@ -5,6 +5,7 @@ import { blind75Sheet } from '../data/blind75Sheet.js';
 import { neetcode150Sheet } from '../data/neetcode150Sheet.js';
 import { cpEssentialsSheet } from '../data/cpEssentialsSheet.js';
 import { getStoredProblems, addProblemToStore, updateProblemInStore, deleteProblemFromStore } from '../data/problemStore.js';
+import { getUserByEmail } from '../data/userStore.js';
 import { getCodeforcesStats } from '../services/dsa/codeforces.adapter.js';
 import { getLeetCodeStats } from '../services/dsa/leetcode.adapter.js';
 import { getAtCoderStats } from '../services/dsa/atcoder.adapter.js';
@@ -141,7 +142,15 @@ function matchServerProblemToTopic(probTopic, topicName) {
 }
 
 router.get('/', async (req, res) => {
-  const { cf_user = '', lc_user = '', ac_user = '', hr_user = '' } = req.query;
+  let { cf_user = '', lc_user = '', ac_user = '', hr_user = '', email = '' } = req.query;
+
+  if (email) {
+    const regUser = getUserByEmail(email);
+    if (regUser) {
+      if (!cf_user && regUser.handles?.codeforces) cf_user = regUser.handles.codeforces;
+      if (!lc_user && regUser.handles?.leetcode) lc_user = regUser.handles.leetcode;
+    }
+  }
 
   try {
     const [cf, lc, ac, hr] = await Promise.all([

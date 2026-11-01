@@ -107,26 +107,28 @@ export function saveOrMergeUser(userData) {
       userData.provider || 'email'
     ]));
 
+    const isExplicit = Boolean(userData.isExplicitUpdate);
+
     const mergedUser = {
       ...existing,
-      username: userData.username || existing.username || defaultUsername,
-      name: userData.name || existing.name,
+      username: (isExplicit ? userData.username : null) || existing.username || userData.username || defaultUsername,
+      name: (isExplicit ? userData.name : null) || existing.name || userData.name,
       avatarUrl: userData.avatarUrl || existing.avatarUrl,
       phone: userData.phone !== undefined ? userData.phone : (existing.phone ?? existing.academic?.phone ?? ''),
       privacy: {
         showEmail: userData.privacy?.showEmail !== undefined ? Boolean(userData.privacy.showEmail) : (existing.privacy?.showEmail !== undefined ? Boolean(existing.privacy.showEmail) : true),
         showPhone: userData.privacy?.showPhone !== undefined ? Boolean(userData.privacy.showPhone) : (existing.privacy?.showPhone !== undefined ? Boolean(existing.privacy.showPhone) : false)
       },
-      targetRole: userData.targetRole || existing.targetRole || 'Software Development Engineer (SDE-1)',
+      targetRole: (isExplicit ? userData.targetRole : null) || existing.targetRole || userData.targetRole || 'Software Development Engineer (SDE-1)',
       academic: {
-        college: userData.academic?.college ?? existing.academic?.college ?? 'Chandigarh University',
-        degree: userData.academic?.degree ?? existing.academic?.degree ?? 'B.Tech Computer Science & Engineering',
-        branch: userData.academic?.branch ?? existing.academic?.branch ?? 'Computer Science',
-        year: userData.academic?.year ?? existing.academic?.year ?? '2026 (Final Year)',
-        cgpa: userData.academic?.cgpa ?? existing.academic?.cgpa ?? '8.85 / 10',
-        desiredOption: userData.academic?.desiredOption ?? existing.academic?.desiredOption ?? (userData.targetRole || existing.targetRole || 'Software Development Engineer (SDE-1)'),
-        dreamCompanies: userData.academic?.dreamCompanies ?? existing.academic?.dreamCompanies ?? 'Google, Microsoft, Uber, Atlassian',
-        workMode: userData.academic?.workMode ?? existing.academic?.workMode ?? 'Hybrid / Remote / On-site'
+        college: (isExplicit ? userData.academic?.college : null) ?? existing.academic?.college ?? userData.academic?.college ?? 'Chandigarh University',
+        degree: (isExplicit ? userData.academic?.degree : null) ?? existing.academic?.degree ?? userData.academic?.degree ?? 'B.Tech Computer Science & Engineering',
+        branch: (isExplicit ? userData.academic?.branch : null) ?? existing.academic?.branch ?? userData.academic?.branch ?? 'Computer Science',
+        year: (isExplicit ? userData.academic?.year : null) ?? existing.academic?.year ?? userData.academic?.year ?? '2026 (Final Year)',
+        cgpa: (isExplicit ? userData.academic?.cgpa : null) ?? existing.academic?.cgpa ?? userData.academic?.cgpa ?? '8.85 / 10',
+        desiredOption: (isExplicit ? userData.academic?.desiredOption : null) ?? existing.academic?.desiredOption ?? userData.academic?.desiredOption ?? (existing.targetRole || userData.targetRole || 'Software Development Engineer (SDE-1)'),
+        dreamCompanies: (isExplicit ? userData.academic?.dreamCompanies : null) ?? existing.academic?.dreamCompanies ?? userData.academic?.dreamCompanies ?? 'Google, Microsoft, Uber, Atlassian',
+        workMode: (isExplicit ? userData.academic?.workMode : null) ?? existing.academic?.workMode ?? userData.academic?.workMode ?? 'Hybrid / Remote / On-site'
       },
       providers: updatedProviders,
       provider: userData.provider || existing.provider,
@@ -134,9 +136,9 @@ export function saveOrMergeUser(userData) {
       emailVerified: userData.emailVerified ?? existing.emailVerified ?? false,
       welcomeEmailSent: userData.welcomeEmailSent ?? existing.welcomeEmailSent ?? false,
       handles: {
-        leetcode: userData.handles?.leetcode || existing.handles?.leetcode || '',
-        codeforces: userData.handles?.codeforces || existing.handles?.codeforces || '',
-        github: userData.handles?.github || existing.handles?.github || ''
+        leetcode: (isExplicit && userData.handles?.leetcode !== undefined ? userData.handles.leetcode : (existing.handles?.leetcode || userData.handles?.leetcode || '')),
+        codeforces: (isExplicit && userData.handles?.codeforces !== undefined ? userData.handles.codeforces : (existing.handles?.codeforces || userData.handles?.codeforces || '')),
+        github: (isExplicit && userData.handles?.github !== undefined ? userData.handles.github : (existing.handles?.github || userData.handles?.github || ''))
       },
       onboardingCompleted: existing.onboardingCompleted ?? Boolean(
         existing.handles?.leetcode || existing.handles?.codeforces || existing.handles?.github

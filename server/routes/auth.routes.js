@@ -159,38 +159,56 @@ router.get('/github/callback', async (req, res) => {
 
     // 3. Try fetching primary verified email if user.email is null
     let primaryEmail = ghUser.email;
-    if (!primaryEmail) {
-      try {
-        const emailsResponse = await fetch('https://api.github.com/user/emails', {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            'User-Agent': 'Placement-Preparation-Dashboard'
-          }
-        });
-        if (emailsResponse.ok) {
-          const emails = await emailsResponse.json();
-          const primary = emails.find((e) => e.primary && e.verified) || emails[0];
-          if (primary) primaryEmail = primary.email;
+    let allGhEmails = [];
+    try {
+      const emailsResponse = await fetch('https://api.github.com/user/emails', {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'User-Agent': 'Placement-Preparation-Dashboard'
         }
-      } catch (emailErr) {
-        console.warn('[GitHub OAuth] Could not fetch private email list:', emailErr.message);
+      });
+      if (emailsResponse.ok) {
+        allGhEmails = await emailsResponse.json();
+        const primary = allGhEmails.find((e) => e.primary && e.verified) || allGhEmails[0];
+        if (primary && !primaryEmail) primaryEmail = primary.email;
       }
+    } catch (emailErr) {
+      console.warn('[GitHub OAuth] Could not fetch private email list:', emailErr.message);
     }
 
-    // 4. Save or unify user account by email
+    // 4. Save or unify user account by email (check all verified GitHub emails for existing account match)
+    let matchedExistingUser = null;
+    if (Array.isArray(allGhEmails)) {
+      for (const e of allGhEmails) {
+        if (e.email) {
+          const found = getUserByEmail(e.email);
+          if (found) {
+            matchedExistingUser = found;
+            primaryEmail = found.email;
+            break;
+          }
+        }
+      }
+    }
+    if (!matchedExistingUser && primaryEmail) {
+      matchedExistingUser = getUserByEmail(primaryEmail);
+    }
+
     const email = primaryEmail || `${ghUser.login}@users.noreply.github.com`;
-    const existing = getUserByEmail(email);
+    const existing = matchedExistingUser || getUserByEmail(email);
     const isNewUser = !existing || !existing.onboardingCompleted;
 
     const studentUser = saveOrMergeUser({
-      id: `gh_${ghUser.id}`,
-      name: ghUser.name || ghUser.login,
+      id: existing?.id || `gh_${ghUser.id}`,
+      name: existing?.name || ghUser.name || ghUser.login,
       email,
-      targetRole: 'Software Development Engineer (SDE-1)',
+      targetRole: existing?.targetRole || 'Software Development Engineer (SDE-1)',
       provider: 'github',
-      avatarUrl: ghUser.avatar_url,
+      avatarUrl: existing?.avatarUrl || ghUser.avatar_url,
       handles: {
-        github: ghUser.login
+        leetcode: existing?.handles?.leetcode || '',
+        codeforces: existing?.handles?.codeforces || '',
+        github: existing?.handles?.github || ghUser.login
       },
       onboardingCompleted: !isNewUser
     });
@@ -285,12 +303,17 @@ router.get('/google/callback', async (req, res) => {
     const isNewUser = !existing || !existing.onboardingCompleted;
 
     const studentUser = saveOrMergeUser({
-      id: `google_${gUser.sub}`,
-      name: gUser.name || gUser.given_name || 'Google User',
+      id: existing?.id || `google_${gUser.sub}`,
+      name: existing?.name || gUser.name || gUser.given_name || 'Google User',
       email,
-      targetRole: 'Software Development Engineer (SDE-1)',
+      targetRole: existing?.targetRole || 'Software Development Engineer (SDE-1)',
       provider: 'google',
-      avatarUrl: gUser.picture,
+      avatarUrl: existing?.avatarUrl || gUser.picture,
+      handles: {
+        leetcode: existing?.handles?.leetcode || '',
+        codeforces: existing?.handles?.codeforces || '',
+        github: existing?.handles?.github || ''
+      },
       onboardingCompleted: !isNewUser
     });
 
@@ -777,14 +800,19 @@ router.post('/register-or-login', (req, res) => {
     return res.status(400).json({ success: false, message: 'Email is required' });
   }
 
+  const existing = getUserByEmail(email);
   const user = saveOrMergeUser({
     email,
-    name,
-    handles,
-    targetRole,
+    name: existing?.name || name,
+    handles: {
+      leetcode: existing?.handles?.leetcode || handles?.leetcode || '',
+      codeforces: existing?.handles?.codeforces || handles?.codeforces || '',
+      github: existing?.handles?.github || handles?.github || ''
+    },
+    targetRole: existing?.targetRole || targetRole,
     provider,
-    password,
-    onboardingCompleted: true
+    password: password || existing?.password,
+    onboardingCompleted: existing?.onboardingCompleted ?? true
   });
 
   const isNew = !user.welcomeEmailSent;

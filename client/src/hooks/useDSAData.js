@@ -18,12 +18,29 @@ export function useDSAData() {
   const [filterStatus, setFilterStatus] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
 
-  const fetchDSA = useCallback(async () => {
+  const fetchDSA = useCallback(async (overrideHandles = null) => {
+    let authUser = null;
     try {
-      const query = new URLSearchParams({
-        cf_user: handles.codeforces || '',
-        lc_user: handles.leetcode || ''
-      }).toString();
+      const raw = window.localStorage.getItem('prep_auth_user');
+      if (raw) authUser = JSON.parse(raw);
+    } catch (e) {
+      // ignore
+    }
+
+    const effectiveHandles = {
+      codeforces: overrideHandles?.codeforces !== undefined ? overrideHandles.codeforces : (handles?.codeforces || authUser?.handles?.codeforces || ''),
+      leetcode: overrideHandles?.leetcode !== undefined ? overrideHandles.leetcode : (handles?.leetcode || authUser?.handles?.leetcode || '')
+    };
+    const email = authUser?.email || '';
+
+    try {
+      const queryParams = {
+        cf_user: effectiveHandles.codeforces || '',
+        lc_user: effectiveHandles.leetcode || ''
+      };
+      if (email) queryParams.email = email;
+
+      const query = new URLSearchParams(queryParams).toString();
 
       const res = await fetch(`/api/dsa?${query}`);
       if (res.ok) {
@@ -160,6 +177,6 @@ export function useDSAData() {
     addProblem,
     updateProblem,
     deleteProblem,
-    refresh: fetchDSA
+    refresh: (overrideHandles = null) => fetchDSA(overrideHandles)
   };
 }

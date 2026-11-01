@@ -196,7 +196,7 @@ export function Settings({ onRefreshAll }) {
         targetRole: targetRoleInput,
         handles: currentHandles,
         academic: updatedAcademic
-      });
+      }, true);
 
       // 2. Sync to backend API
       try {

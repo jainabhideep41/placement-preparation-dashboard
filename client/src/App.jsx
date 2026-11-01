@@ -50,19 +50,21 @@ export function App() {
     const unified = saveUserToRegistry(user);
     setCurrentUser(unified);
 
-    if (unified.handles) {
-      setHandles({
-        leetcode: unified.handles.leetcode || '',
-        codeforces: unified.handles.codeforces || '',
-        github: unified.handles.github || ''
-      });
-    }
+    const activeHandles = {
+      leetcode: unified.handles?.leetcode || '',
+      codeforces: unified.handles?.codeforces || '',
+      github: unified.handles?.github || ''
+    };
+
+    setHandles(activeHandles);
 
     // Clear stale caches so dashboard loads the student's fresh profile
     window.localStorage.removeItem('prep_dashboard_cache');
     window.localStorage.removeItem('prep_dsa_cache');
     setTimeout(() => {
-      handleRefreshAll();
+      dashboardHook.refresh(activeHandles, unified.targetRole);
+      dsaHook.refresh(activeHandles);
+      progressHook.refreshProgress();
       navigate('/dashboard');
     }, 100);
   };
@@ -80,7 +82,7 @@ export function App() {
         const existingRegistryUser = findUserByEmail(email);
 
         // Check if user has already completed onboarding
-        const hasCompletedOnboarding = existingRegistryUser?.onboardingCompleted;
+        const hasCompletedOnboarding = existingRegistryUser?.onboardingCompleted || authenticatedUser.onboardingCompleted;
 
         // If it's a first time OAuth user who has not completed onboarding
         if (authenticatedUser.isNewUser && !hasCompletedOnboarding) {
@@ -88,12 +90,18 @@ export function App() {
         } else {
           // Unified account: merge with existing account and log in directly
           const unifiedUser = saveUserToRegistry({
-            ...existingRegistryUser,
             ...authenticatedUser,
+            ...existingRegistryUser,
+            name: existingRegistryUser?.name || authenticatedUser.name,
+            targetRole: existingRegistryUser?.targetRole || authenticatedUser.targetRole,
             handles: {
               leetcode: existingRegistryUser?.handles?.leetcode || authenticatedUser.handles?.leetcode || '',
               codeforces: existingRegistryUser?.handles?.codeforces || authenticatedUser.handles?.codeforces || '',
-              github: authenticatedUser.handles?.github || existingRegistryUser?.handles?.github || ''
+              github: existingRegistryUser?.handles?.github || authenticatedUser.handles?.github || ''
+            },
+            academic: {
+              ...(authenticatedUser.academic || {}),
+              ...(existingRegistryUser?.academic || {})
             },
             onboardingCompleted: true
           });
@@ -119,11 +127,11 @@ export function App() {
       handles: {
         leetcode: handles.leetcode || existing?.handles?.leetcode || '',
         codeforces: handles.codeforces || existing?.handles?.codeforces || '',
-        github: handles.github || onboardingUser.handles?.github || existing?.handles?.github || ''
+        github: handles.github || existing?.handles?.github || onboardingUser.handles?.github || ''
       },
       targetRole: targetRole || existing?.targetRole || onboardingUser.targetRole,
       onboardingCompleted: true
-    });
+    }, true);
 
     try {
       fetch('/api/auth/complete-onboarding', {
