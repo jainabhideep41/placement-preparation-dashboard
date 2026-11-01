@@ -42,6 +42,11 @@ export function saveUserToRegistry(user) {
     username: user.username || existing?.username || defaultUsername,
     name: user.name || existing?.name || emailKey.split('@')[0],
     avatarUrl: user.avatarUrl || existing?.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || emailKey.split('@')[0])}&background=111&color=fff`,
+    phone: user.phone !== undefined ? user.phone : (existing?.phone || user.academic?.phone || existing?.academic?.phone || ''),
+    privacy: {
+      showEmail: user.privacy?.showEmail !== undefined ? Boolean(user.privacy.showEmail) : (existing?.privacy?.showEmail !== undefined ? Boolean(existing.privacy.showEmail) : true),
+      showPhone: user.privacy?.showPhone !== undefined ? Boolean(user.privacy.showPhone) : (existing?.privacy?.showPhone !== undefined ? Boolean(existing.privacy.showPhone) : false)
+    },
     targetRole: user.targetRole || existing?.targetRole || 'Software Development Engineer (SDE-1)',
     academic: {
       college: user.academic?.college ?? existing?.academic?.college ?? 'Chandigarh University',

@@ -30,7 +30,11 @@ import {
   Building2,
   Settings as SettingsIcon,
   Edit3,
-  FileText
+  FileText,
+  Mail,
+  Phone,
+  EyeOff,
+  Lock
 } from 'lucide-react';
 import { findUserByIdentifier } from '../utils/accountManager';
 import { JakeResumeModal } from '../components/profile/JakeResumeModal';
@@ -99,6 +103,12 @@ export function PublicProfile({ currentUser }) {
           const mergedProfile = {
             ...data.profile,
             name: localUser?.name || data.profile.name,
+            phone: data.profile.phone !== undefined ? data.profile.phone : (localUser?.privacy?.showPhone ? (localUser.phone || localUser.academic?.phone) : null),
+            email: data.profile.email !== undefined ? data.profile.email : (localUser?.privacy?.showEmail !== false ? localUser?.email : null),
+            privacy: {
+              showEmail: data.profile.privacy?.showEmail !== undefined ? data.profile.privacy.showEmail : (localUser?.privacy?.showEmail !== false),
+              showPhone: data.profile.privacy?.showPhone !== undefined ? data.profile.privacy.showPhone : Boolean(localUser?.privacy?.showPhone)
+            },
             targetRole: localUser?.targetRole || data.profile.targetRole,
             academic: localUser?.academic ? { ...data.profile.academic, ...localUser.academic } : data.profile.academic,
             handles: {
@@ -121,6 +131,12 @@ export function PublicProfile({ currentUser }) {
           identifier: resolvedIdentifier,
           isRegistered: Boolean(localUser),
           name: localUser?.name || resolvedIdentifier,
+          phone: localUser?.privacy?.showPhone ? (localUser.phone || localUser.academic?.phone) : null,
+          email: localUser?.privacy?.showEmail !== false ? localUser?.email : null,
+          privacy: {
+            showEmail: localUser?.privacy?.showEmail !== false,
+            showPhone: Boolean(localUser?.privacy?.showPhone)
+          },
           targetRole: localUser?.targetRole || 'Software Development Engineer (SDE-1)',
           avatarUrl: localUser?.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(localUser?.name || resolvedIdentifier)}&background=111&color=fff`,
           bio: 'Aspiring Software Engineer with verified competence across Data Structures, Algorithms, Distributed Systems, and Full-Stack Engineering.',
@@ -265,11 +281,13 @@ export function PublicProfile({ currentUser }) {
     );
   }
 
-  const isSelf = currentUser && (
-    currentUser.name?.toLowerCase() === profile?.name?.toLowerCase() ||
-    currentUser.handles?.leetcode?.toLowerCase() === profile?.handles?.leetcode?.toLowerCase() ||
-    currentUser.handles?.github?.toLowerCase() === profile?.handles?.github?.toLowerCase()
-  );
+  const isSelf = Boolean(currentUser && (
+    (currentUser.username && currentUser.username.toLowerCase() === canonicalUsername) ||
+    (currentUser.email && profile?.email && currentUser.email.toLowerCase() === profile.email.toLowerCase()) ||
+    (currentUser.name && profile?.name && currentUser.name.toLowerCase() === profile.name.toLowerCase()) ||
+    (currentUser.handles?.leetcode && currentUser.handles.leetcode.toLowerCase() === profile?.handles?.leetcode?.toLowerCase()) ||
+    (currentUser.handles?.github && currentUser.handles.github.toLowerCase() === profile?.handles?.github?.toLowerCase())
+  ));
 
   return (
     <div className="min-h-screen bg-[#EFEFEF] text-black font-sans selection:bg-black selection:text-white pb-16 print:bg-white print:p-0">
@@ -470,6 +488,76 @@ export function PublicProfile({ currentUser }) {
                     </a>
                   )}
                 </div>
+
+                {/* Contact Information & Privacy Badges */}
+                {(() => {
+                  const effectivePhone = profile.phone || (isSelf ? (currentUser?.phone || currentUser?.academic?.phone) : null);
+                  const effectiveEmail = profile.email || (isSelf ? currentUser?.email : null);
+                  const isPhonePublic = Boolean(profile.phone || (isSelf && currentUser?.privacy?.showPhone));
+                  const isEmailPublic = Boolean(profile.email || (isSelf && currentUser?.privacy?.showEmail !== false));
+
+                  if (!effectivePhone && !effectiveEmail) return null;
+
+                  return (
+                    <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-black/10 mt-1">
+                      {effectiveEmail && (
+                        isEmailPublic ? (
+                          <a
+                            href={`mailto:${effectiveEmail}`}
+                            className="inline-flex items-center gap-1.5 font-mono text-xs font-bold px-2.5 py-1 bg-emerald-50 text-emerald-950 border border-black rounded hover:bg-emerald-100 transition-colors shadow-[1px_1px_0px_0px_#000]"
+                            title="Recruiter Public Email"
+                          >
+                            <Mail className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>{effectiveEmail}</span>
+                            <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.2 rounded bg-emerald-200 text-emerald-900 border border-emerald-400">
+                              Public
+                            </span>
+                          </a>
+                        ) : isSelf ? (
+                          <div
+                            className="inline-flex items-center gap-1.5 font-mono text-xs font-bold px-2.5 py-1 bg-neutral-100 text-neutral-700 border border-black/30 rounded shadow-[1px_1px_0px_0px_#000]"
+                            title="Email is private (hidden from public visitors/recruiters)"
+                          >
+                            <Mail className="w-3.5 h-3.5 text-neutral-500" />
+                            <span>{effectiveEmail}</span>
+                            <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.2 rounded bg-neutral-200 text-neutral-600 border border-neutral-300 flex items-center gap-0.5">
+                              <EyeOff className="w-2.5 h-2.5" />
+                              Private
+                            </span>
+                          </div>
+                        ) : null
+                      )}
+
+                      {effectivePhone && (
+                        isPhonePublic ? (
+                          <a
+                            href={`tel:${effectivePhone}`}
+                            className="inline-flex items-center gap-1.5 font-mono text-xs font-bold px-2.5 py-1 bg-emerald-50 text-emerald-950 border border-black rounded hover:bg-emerald-100 transition-colors shadow-[1px_1px_0px_0px_#000]"
+                            title="Recruiter Public Phone"
+                          >
+                            <Phone className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>{effectivePhone}</span>
+                            <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.2 rounded bg-emerald-200 text-emerald-900 border border-emerald-400">
+                              Public
+                            </span>
+                          </a>
+                        ) : isSelf ? (
+                          <div
+                            className="inline-flex items-center gap-1.5 font-mono text-xs font-bold px-2.5 py-1 bg-neutral-100 text-neutral-700 border border-black/30 rounded shadow-[1px_1px_0px_0px_#000]"
+                            title="Phone is private (hidden from public visitors/recruiters)"
+                          >
+                            <Phone className="w-3.5 h-3.5 text-neutral-500" />
+                            <span>{effectivePhone}</span>
+                            <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.2 rounded bg-neutral-200 text-neutral-600 border border-neutral-300 flex items-center gap-0.5">
+                              <EyeOff className="w-2.5 h-2.5" />
+                              Private
+                            </span>
+                          </div>
+                        ) : null
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
 
@@ -1030,7 +1118,12 @@ export function PublicProfile({ currentUser }) {
       <JakeResumeModal 
         isOpen={showResumeModal} 
         onClose={() => setShowResumeModal(false)} 
-        profile={profile} 
+        profile={profile ? {
+          ...profile,
+          phone: profile.phone || (isSelf ? (currentUser?.phone || currentUser?.academic?.phone) : null),
+          email: profile.email || (isSelf ? currentUser?.email : null),
+          privacy: profile.privacy || (isSelf ? currentUser?.privacy : null)
+        } : null} 
       />
     </div>
   );

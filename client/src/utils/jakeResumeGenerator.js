@@ -17,7 +17,7 @@ export function escapeLatex(str) {
 /**
  * Normalizes and extracts structured resume data from a candidate profile
  */
-export function getResumeStructuredData(profile) {
+export function getResumeStructuredData(profile, options = {}) {
   const academic = profile?.academic || {};
   const handles = profile?.handles || {};
   const dsa = profile?.dsa || {};
@@ -33,8 +33,20 @@ export function getResumeStructuredData(profile) {
   const year = academic.year || '2022 -- 2026';
   const cgpa = academic.cgpa || '8.85 / 10.0';
   const location = profile?.location || academic.location || 'India';
-  const email = profile?.email || `${(profile?.identifier || 'candidate').toLowerCase()}@prepstack.dev`;
-  const phone = academic.phone || '+91 98765 43210';
+
+  // Email with privacy resolution
+  const rawEmail = profile?.email || profile?.userEmail || (profile?.identifier ? `${profile.identifier.toLowerCase()}@prepstack.dev` : 'candidate@prepstack.dev');
+  const showEmail = options.includeEmail !== undefined
+    ? Boolean(options.includeEmail)
+    : (profile?.privacy?.showEmail !== false);
+  const email = showEmail ? rawEmail : null;
+
+  // Phone with privacy resolution
+  const rawPhone = profile?.phone || academic.phone || '+91 98765 43210';
+  const showPhone = options.includePhone !== undefined
+    ? Boolean(options.includePhone)
+    : (profile?.privacy?.showPhone ?? false);
+  const phone = showPhone ? rawPhone : null;
 
   // Construct links
   const linkedinHandle = handles.linkedin || profile?.identifier || 'candidate';
@@ -136,16 +148,25 @@ export function getResumeStructuredData(profile) {
 /**
  * Generates exact Overleaf-compliant Jake's Resume LaTeX Code
  */
-export function generateJakeResumeLatex(profile) {
-  const data = getResumeStructuredData(profile);
+export function generateJakeResumeLatex(profile, options = {}) {
+  const data = getResumeStructuredData(profile, options);
 
-  const contactItems = [
-    escapeLatex(data.phone),
-    `\\href{mailto:${data.email}}{\\underline{${escapeLatex(data.email)}}}`,
-    `\\href{https://linkedin.com/in/${data.linkedinHandle}}{\\underline{linkedin.com/in/${escapeLatex(data.linkedinHandle)}}}`,
-    `\\href{https://github.com/${data.githubHandle}}{\\underline{github.com/${escapeLatex(data.githubHandle)}}}`,
-    `\\href{https://leetcode.com/u/${data.leetcodeHandle}}{\\underline{leetcode.com/u/${escapeLatex(data.leetcodeHandle)}}}`
-  ];
+  const contactItems = [];
+  if (data.phone) {
+    contactItems.push(escapeLatex(data.phone));
+  }
+  if (data.email) {
+    contactItems.push(`\\href{mailto:${data.email}}{\\underline{${escapeLatex(data.email)}}}`);
+  }
+  if (data.linkedinHandle) {
+    contactItems.push(`\\href{https://linkedin.com/in/${data.linkedinHandle}}{\\underline{linkedin.com/in/${escapeLatex(data.linkedinHandle)}}}`);
+  }
+  if (data.githubHandle) {
+    contactItems.push(`\\href{https://github.com/${data.githubHandle}}{\\underline{github.com/${escapeLatex(data.githubHandle)}}}`);
+  }
+  if (data.leetcodeHandle) {
+    contactItems.push(`\\href{https://leetcode.com/u/${data.leetcodeHandle}}{\\underline{leetcode.com/u/${escapeLatex(data.leetcodeHandle)}}}`);
+  }
 
   const contactLine = contactItems.join(' $|$ ');
 
@@ -293,11 +314,11 @@ ${achievementsLatex}
 /**
  * Triggers a direct browser download of the Jake's Resume .tex file
  */
-export function downloadLatexFile(profile) {
-  const latexContent = generateJakeResumeLatex(profile);
-  const data = getResumeStructuredData(profile);
+export function downloadLatexFile(profile, filenameOverride = null, options = {}) {
+  const latexContent = generateJakeResumeLatex(profile, options);
+  const data = getResumeStructuredData(profile, options);
   const cleanName = data.name.replace(/[^a-zA-Z0-9_-]/g, '_');
-  const filename = `${cleanName}_Jake_Resume.tex`;
+  const filename = filenameOverride || `${cleanName}_Jake_Resume.tex`;
 
   const blob = new Blob([latexContent], { type: 'text/x-tex;charset=utf-8' });
   const url = URL.createObjectURL(blob);

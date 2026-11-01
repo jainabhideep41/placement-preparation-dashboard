@@ -112,6 +112,11 @@ export function saveOrMergeUser(userData) {
       username: userData.username || existing.username || defaultUsername,
       name: userData.name || existing.name,
       avatarUrl: userData.avatarUrl || existing.avatarUrl,
+      phone: userData.phone !== undefined ? userData.phone : (existing.phone ?? existing.academic?.phone ?? ''),
+      privacy: {
+        showEmail: userData.privacy?.showEmail !== undefined ? Boolean(userData.privacy.showEmail) : (existing.privacy?.showEmail !== undefined ? Boolean(existing.privacy.showEmail) : true),
+        showPhone: userData.privacy?.showPhone !== undefined ? Boolean(userData.privacy.showPhone) : (existing.privacy?.showPhone !== undefined ? Boolean(existing.privacy.showPhone) : false)
+      },
       targetRole: userData.targetRole || existing.targetRole || 'Software Development Engineer (SDE-1)',
       academic: {
         college: userData.academic?.college ?? existing.academic?.college ?? 'Chandigarh University',
@@ -150,6 +155,11 @@ export function saveOrMergeUser(userData) {
     email: emailKey,
     username: defaultUsername,
     name: userData.name || emailKey.split('@')[0],
+    phone: userData.phone || userData.academic?.phone || '',
+    privacy: {
+      showEmail: userData.privacy?.showEmail !== undefined ? Boolean(userData.privacy.showEmail) : true,
+      showPhone: userData.privacy?.showPhone !== undefined ? Boolean(userData.privacy.showPhone) : false
+    },
     password: userData.password || null,
     emailVerified: userData.emailVerified || (userData.provider === 'google' || userData.provider === 'github'),
     welcomeEmailSent: userData.welcomeEmailSent || false,
@@ -208,6 +218,13 @@ export function updateUserProfile(email, profileData = {}) {
   if (profileData.name) user.name = profileData.name.trim();
   if (profileData.targetRole) user.targetRole = profileData.targetRole.trim();
   if (profileData.avatarUrl) user.avatarUrl = profileData.avatarUrl.trim();
+  if (profileData.phone !== undefined) user.phone = profileData.phone.trim();
+  if (profileData.privacy) {
+    user.privacy = {
+      showEmail: profileData.privacy.showEmail !== undefined ? Boolean(profileData.privacy.showEmail) : (user.privacy?.showEmail ?? true),
+      showPhone: profileData.privacy.showPhone !== undefined ? Boolean(profileData.privacy.showPhone) : (user.privacy?.showPhone ?? false)
+    };
+  }
   if (profileData.handles) {
     user.handles = {
       leetcode: profileData.handles.leetcode !== undefined ? profileData.handles.leetcode.trim() : (user.handles?.leetcode || ''),

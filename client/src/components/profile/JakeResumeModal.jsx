@@ -22,9 +22,16 @@ export function JakeResumeModal({ isOpen, onClose, profile }) {
 
   const [activeTab, setActiveTab] = useState('preview'); // 'preview' | 'latex'
   const [copied, setCopied] = useState(false);
+  const [includeEmail, setIncludeEmail] = useState(
+    profile?.privacy?.showEmail !== false
+  );
+  const [includePhone, setIncludePhone] = useState(
+    Boolean(profile?.privacy?.showPhone)
+  );
 
-  const resumeData = getResumeStructuredData(profile);
-  const latexSource = generateJakeResumeLatex(profile);
+  const resumeOptions = { includeEmail, includePhone };
+  const resumeData = getResumeStructuredData(profile, resumeOptions);
+  const latexSource = generateJakeResumeLatex(profile, resumeOptions);
 
   const handleCopyLatex = () => {
     if (navigator.clipboard) {
@@ -40,7 +47,7 @@ export function JakeResumeModal({ isOpen, onClose, profile }) {
   };
 
   const handleDownloadTex = () => {
-    downloadLatexFile(profile);
+    downloadLatexFile(profile, null, resumeOptions);
   };
 
   return (
@@ -145,23 +152,40 @@ export function JakeResumeModal({ isOpen, onClose, profile }) {
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 print:p-0 print:overflow-visible">
           {activeTab === 'preview' ? (
             <div className="max-w-[780px] mx-auto space-y-4">
-              {/* Overleaf Instructions Banner (Hidden in Print) */}
-              <div className="p-3 rounded-2xl bg-white border border-black/15 flex items-center justify-between gap-3 text-xs font-mono print:hidden shadow-xs">
+              {/* Overleaf Instructions & Contact Export Options Banner (Hidden in Print) */}
+              <div className="p-3.5 rounded-2xl bg-white border border-black/15 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs font-mono print:hidden shadow-xs">
                 <div className="flex items-center gap-2 text-black/70">
                   <Sparkles className="w-4 h-4 text-emerald-600 shrink-0" />
                   <span>
-                    <strong>ATS Formatting Tip:</strong> Click &ldquo;Download PDF&rdquo; &rarr; Choose &ldquo;Save as PDF&rdquo; &rarr; Set Margins to &ldquo;None / Minimum&rdquo;.
+                    <strong>ATS Formatting Tip:</strong> Set Margins to &ldquo;None / Minimum&rdquo; when saving PDF.
                   </span>
                 </div>
-                <a
-                  href="https://www.overleaf.com/docs"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:underline shrink-0"
-                >
-                  <span>Overleaf Guide</span>
-                  <ExternalLink className="w-3 h-3" />
-                </a>
+
+                <div className="flex items-center gap-3 text-[11px] font-mono shrink-0">
+                  <span className="font-bold text-black/50 uppercase text-[10px]">Export Contacts:</span>
+                  <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={includeEmail}
+                      onChange={(e) => setIncludeEmail(e.target.checked)}
+                      className="rounded border-black text-black focus:ring-0 cursor-pointer"
+                    />
+                    <span className={includeEmail ? 'font-bold text-black' : 'text-black/40 line-through'}>
+                      Email
+                    </span>
+                  </label>
+                  <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={includePhone}
+                      onChange={(e) => setIncludePhone(e.target.checked)}
+                      className="rounded border-black text-black focus:ring-0 cursor-pointer"
+                    />
+                    <span className={includePhone ? 'font-bold text-black' : 'text-black/40 line-through'}>
+                      Phone
+                    </span>
+                  </label>
+                </div>
               </div>
 
               {/* JAKE RESUME SHEET (Pixel-Perfect Overleaf Replica) */}
@@ -176,38 +200,65 @@ export function JakeResumeModal({ isOpen, onClose, profile }) {
                     {resumeData.name}
                   </h1>
                   <div className="text-[11px] sm:text-xs text-black/85 mt-1.5 flex items-center justify-center gap-2 flex-wrap">
-                    <span>{resumeData.phone}</span>
-                    <span>$|$</span>
-                    <a href={`mailto:${resumeData.email}`} className="text-black hover:underline">
-                      {resumeData.email}
-                    </a>
-                    <span>$|$</span>
-                    <a 
-                      href={`https://linkedin.com/in/${resumeData.linkedinHandle}`} 
-                      target="_blank" 
-                      rel="noopener noreferrer" 
-                      className="text-black hover:underline"
-                    >
-                      linkedin.com/in/{resumeData.linkedinHandle}
-                    </a>
-                    <span>$|$</span>
-                    <a 
-                      href={`https://github.com/${resumeData.githubHandle}`} 
-                      target="_blank" 
-                      rel="noopener noreferrer" 
-                      className="text-black hover:underline"
-                    >
-                      github.com/{resumeData.githubHandle}
-                    </a>
-                    <span>$|$</span>
-                    <a 
-                      href={`https://leetcode.com/u/${resumeData.leetcodeHandle}`} 
-                      target="_blank" 
-                      rel="noopener noreferrer" 
-                      className="text-black hover:underline"
-                    >
-                      leetcode.com/u/{resumeData.leetcodeHandle}
-                    </a>
+                    {(() => {
+                      const items = [];
+                      if (resumeData.phone) {
+                        items.push(<span key="phone">{resumeData.phone}</span>);
+                      }
+                      if (resumeData.email) {
+                        items.push(
+                          <a key="email" href={`mailto:${resumeData.email}`} className="text-black hover:underline">
+                            {resumeData.email}
+                          </a>
+                        );
+                      }
+                      if (resumeData.linkedinHandle) {
+                        items.push(
+                          <a 
+                            key="linkedin"
+                            href={`https://linkedin.com/in/${resumeData.linkedinHandle}`} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="text-black hover:underline"
+                          >
+                            linkedin.com/in/{resumeData.linkedinHandle}
+                          </a>
+                        );
+                      }
+                      if (resumeData.githubHandle) {
+                        items.push(
+                          <a 
+                            key="github"
+                            href={`https://github.com/${resumeData.githubHandle}`} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="text-black hover:underline"
+                          >
+                            github.com/{resumeData.githubHandle}
+                          </a>
+                        );
+                      }
+                      if (resumeData.leetcodeHandle) {
+                        items.push(
+                          <a 
+                            key="leetcode"
+                            href={`https://leetcode.com/u/${resumeData.leetcodeHandle}`} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="text-black hover:underline"
+                          >
+                            leetcode.com/u/{resumeData.leetcodeHandle}
+                          </a>
+                        );
+                      }
+
+                      return items.map((item, idx) => (
+                        <React.Fragment key={idx}>
+                          {idx > 0 && <span className="text-black/50 font-sans text-[10px]">$|$</span>}
+                          {item}
+                        </React.Fragment>
+                      ));
+                    })()}
                   </div>
                 </div>
 

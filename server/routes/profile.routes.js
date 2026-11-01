@@ -75,6 +75,9 @@ router.get('/:identifier', async (req, res) => {
       targetRole: targetRole || req.query.role || 'Software Development Engineer (SDE-1)'
     });
 
+    const showEmail = matchedUser?.privacy?.showEmail !== undefined ? Boolean(matchedUser.privacy.showEmail) : true;
+    const showPhone = matchedUser?.privacy?.showPhone !== undefined ? Boolean(matchedUser.privacy.showPhone) : false;
+
     const publicProfile = {
       identifier,
       username: matchedUser?.username || identifier,
@@ -82,6 +85,12 @@ router.get('/:identifier', async (req, res) => {
       name: displayName,
       targetRole,
       avatarUrl,
+      email: showEmail ? (matchedUser?.email || null) : null,
+      phone: showPhone ? (matchedUser?.phone || matchedUser?.academic?.phone || null) : null,
+      privacy: {
+        showEmail,
+        showPhone
+      },
       academic: matchedUser?.academic || {
         college: 'Chandigarh University',
         degree: 'B.Tech Computer Science & Engineering',

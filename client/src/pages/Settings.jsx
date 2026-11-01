@@ -23,7 +23,12 @@ import {
   GraduationCap,
   Building2,
   Calendar,
-  Briefcase
+  Briefcase,
+  Phone,
+  Mail,
+  Eye,
+  EyeOff,
+  Shield
 } from 'lucide-react';
 import { useLocalCache } from '../hooks/useLocalCache';
 import { Badge } from '../components/common/Badge';
@@ -59,6 +64,21 @@ export function Settings({ onRefreshAll }) {
   const [cgpaInput, setCgpaInput] = useState(currentUser?.academic?.cgpa || '8.85 / 10');
   const [dreamCompaniesInput, setDreamCompaniesInput] = useState(currentUser?.academic?.dreamCompanies || 'Google, Microsoft, Uber, Atlassian');
   const [workModeInput, setWorkModeInput] = useState(currentUser?.academic?.workMode || 'Hybrid / Remote / On-site');
+
+  // Contact Information & Privacy Visibility States
+  const [phoneInput, setPhoneInput] = useState(
+    currentUser?.phone || currentUser?.academic?.phone || ''
+  );
+  const [emailInput, setEmailInput] = useState(
+    currentUser?.email || ''
+  );
+  const [showEmailPublicly, setShowEmailPublicly] = useState(
+    currentUser?.privacy?.showEmail !== undefined ? Boolean(currentUser.privacy.showEmail) : true
+  );
+  const [showPhonePublicly, setShowPhonePublicly] = useState(
+    currentUser?.privacy?.showPhone !== undefined ? Boolean(currentUser.privacy.showPhone) : false
+  );
+
   const [academicSavedSuccess, setAcademicSavedSuccess] = useState(false);
   const [academicError, setAcademicError] = useState('');
 
@@ -82,6 +102,18 @@ export function Settings({ onRefreshAll }) {
       setUsernameInput(currentUser.email.split('@')[0].replace(/[^a-z0-9_-]/gi, '').toLowerCase());
     }
     if (currentUser?.name) setNameInput(currentUser.name);
+    if (currentUser?.email) setEmailInput(currentUser.email);
+    if (currentUser?.phone !== undefined) {
+      setPhoneInput(currentUser.phone);
+    } else if (currentUser?.academic?.phone) {
+      setPhoneInput(currentUser.academic.phone);
+    }
+    if (currentUser?.privacy?.showEmail !== undefined) {
+      setShowEmailPublicly(Boolean(currentUser.privacy.showEmail));
+    }
+    if (currentUser?.privacy?.showPhone !== undefined) {
+      setShowPhonePublicly(Boolean(currentUser.privacy.showPhone));
+    }
     if (currentUser?.targetRole) setTargetRoleInput(currentUser.targetRole);
     if (currentUser?.academic) {
       if (currentUser.academic.college) setCollegeInput(currentUser.academic.college);
@@ -130,6 +162,11 @@ export function Settings({ onRefreshAll }) {
       return;
     }
 
+    const updatedPrivacy = {
+      showEmail: Boolean(showEmailPublicly),
+      showPhone: Boolean(showPhonePublicly)
+    };
+
     const updatedAcademic = {
       college: collegeInput.trim(),
       degree: degreeInput.trim(),
@@ -137,7 +174,8 @@ export function Settings({ onRefreshAll }) {
       cgpa: cgpaInput.trim(),
       desiredOption: targetRoleInput,
       dreamCompanies: dreamCompaniesInput.trim(),
-      workMode: workModeInput
+      workMode: workModeInput,
+      phone: phoneInput.trim()
     };
 
     // 1. Save locally in registry & prep_auth_user
@@ -150,6 +188,9 @@ export function Settings({ onRefreshAll }) {
 
       saveUserToRegistry({
         ...currentUser,
+        email: emailInput.trim() || currentUser.email,
+        phone: phoneInput.trim(),
+        privacy: updatedPrivacy,
         username: cleanUsername,
         name: nameInput.trim() || currentUser.name,
         targetRole: targetRoleInput,
@@ -164,6 +205,8 @@ export function Settings({ onRefreshAll }) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             email: currentUser.email,
+            phone: phoneInput.trim(),
+            privacy: updatedPrivacy,
             username: cleanUsername,
             name: nameInput.trim() || currentUser.name,
             targetRole: targetRoleInput,
@@ -580,6 +623,128 @@ export function Settings({ onRefreshAll }) {
                 placeholder="e.g. 8.85 / 10 CGPA or 88%"
                 className="w-full px-3 py-2 rounded-xl bg-white border border-black/20 text-xs font-mono font-bold text-black focus:outline-none focus:border-black"
               />
+            </div>
+          </div>
+
+          {/* Contact Information & Privacy Visibility Controls */}
+          <div className="p-4 sm:p-5 rounded-2xl bg-[#F9F9F7] border-2 border-black/15 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-black/10 pb-2.5">
+              <div>
+                <span className="font-bold text-black text-xs sm:text-sm flex items-center gap-1.5 font-display">
+                  <Shield className="w-4 h-4 text-emerald-600" />
+                  <span>Contact Details &amp; Granular Privacy Controls</span>
+                </span>
+                <p className="text-[11px] text-black/60 mt-0.5">
+                  Save your mobile number and email. Mark each section as Public (recruiter visible) or Private according to your choice.
+                </p>
+              </div>
+              <span className="text-[10px] font-mono uppercase px-2.5 py-1 rounded-full font-bold bg-white text-black border border-black/20 shrink-0 self-start sm:self-auto shadow-xs">
+                Candidate Privacy
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+              {/* Email Address & Privacy Toggle */}
+              <div className="p-3.5 rounded-xl bg-white border border-black/20 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <label className="font-bold text-black flex items-center gap-1.5">
+                    <Mail className="w-3.5 h-3.5 text-black/60" />
+                    <span>Email Address</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowEmailPublicly(prev => !prev)}
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-mono text-[11px] font-bold border transition-all cursor-pointer ${
+                      showEmailPublicly
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-400 hover:bg-emerald-100 shadow-xs'
+                        : 'bg-neutral-100 text-neutral-700 border-neutral-300 hover:bg-neutral-200'
+                    }`}
+                    title={showEmailPublicly ? 'Email is currently Public. Click to make Private.' : 'Email is currently Private. Click to make Public.'}
+                  >
+                    {showEmailPublicly ? (
+                      <>
+                        <Eye className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Public</span>
+                      </>
+                    ) : (
+                      <>
+                        <EyeOff className="w-3.5 h-3.5 text-neutral-500" />
+                        <span>Private</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                <input
+                  type="email"
+                  value={emailInput}
+                  onChange={(e) => setEmailInput(e.target.value)}
+                  placeholder="e.g. candidate@domain.com"
+                  className="w-full px-3 py-2 rounded-xl bg-[#F9F9F7] border border-black/15 text-xs font-mono font-medium text-black focus:outline-none focus:border-black"
+                />
+
+                <div className="flex items-center justify-between text-[10.5px] leading-tight">
+                  <span className={showEmailPublicly ? 'text-emerald-700 font-medium' : 'text-neutral-500 font-medium'}>
+                    {showEmailPublicly
+                      ? '✓ Publicly visible to recruiters on your profile & default resume.'
+                      : '🔒 Private — Masked from public profile to prevent spam.'}
+                  </span>
+                  <span className="font-mono text-[10px] text-black/40 font-semibold shrink-0 ml-1">
+                    {showEmailPublicly ? 'Recruiter Ready' : 'Hidden'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Mobile Phone & Privacy Toggle */}
+              <div className="p-3.5 rounded-xl bg-white border border-black/20 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <label className="font-bold text-black flex items-center gap-1.5">
+                    <Phone className="w-3.5 h-3.5 text-black/60" />
+                    <span>Mobile Phone Number</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowPhonePublicly(prev => !prev)}
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-mono text-[11px] font-bold border transition-all cursor-pointer ${
+                      showPhonePublicly
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-400 hover:bg-emerald-100 shadow-xs'
+                        : 'bg-neutral-100 text-neutral-700 border-neutral-300 hover:bg-neutral-200'
+                    }`}
+                    title={showPhonePublicly ? 'Phone is currently Public. Click to make Private.' : 'Phone is currently Private. Click to make Public.'}
+                  >
+                    {showPhonePublicly ? (
+                      <>
+                        <Eye className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Public</span>
+                      </>
+                    ) : (
+                      <>
+                        <EyeOff className="w-3.5 h-3.5 text-neutral-500" />
+                        <span>Private</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                <input
+                  type="tel"
+                  value={phoneInput}
+                  onChange={(e) => setPhoneInput(e.target.value)}
+                  placeholder="e.g. +91 98765 43210"
+                  className="w-full px-3 py-2 rounded-xl bg-[#F9F9F7] border border-black/15 text-xs font-mono font-medium text-black focus:outline-none focus:border-black"
+                />
+
+                <div className="flex items-center justify-between text-[10.5px] leading-tight">
+                  <span className={showPhonePublicly ? 'text-emerald-700 font-medium' : 'text-neutral-500 font-medium'}>
+                    {showPhonePublicly
+                      ? '✓ Publicly visible for phone screenings and resume downloads.'
+                      : '🔒 Private — Masked from public profile. Visible only to you.'}
+                  </span>
+                  <span className="font-mono text-[10px] text-black/40 font-semibold shrink-0 ml-1">
+                    {showPhonePublicly ? 'Screening Ready' : 'Confidential'}
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
 
