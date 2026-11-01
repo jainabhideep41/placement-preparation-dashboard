@@ -12,6 +12,7 @@ import { Settings } from './pages/Settings';
 import { Login } from './pages/Login';
 import { PublicProfile } from './pages/PublicProfile';
 import { OnboardingModal } from './components/common/OnboardingModal';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { findUserByEmail, saveUserToRegistry } from './utils/accountManager';
 
 import { useDashboardData } from './hooks/useDashboardData';
@@ -247,40 +248,42 @@ export function App() {
 
         {/* Main Content Area with Real URL Routes */}
         <main className="flex-1 lg:pl-64 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full transition-all">
-          <Routes>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route
-              path="/dashboard"
-              element={
-                <Dashboard
-                  dashboardData={dashboardHook.data}
-                  loading={dashboardHook.loading}
-                  onNavigate={handleNavigate}
-                  onRefreshAll={handleRefreshAll}
-                />
-              }
-            />
-            <Route path="/dsa" element={<DSA dsaHook={dsaHook} />} />
-            <Route path="/webdev" element={<WebDevelopment progressHook={progressHook} />} />
-            <Route path="/web-development" element={<Navigate to="/webdev" replace />} />
-            <Route path="/system-design" element={<SystemDesign progressHook={progressHook} />} />
-            <Route path="/systemdesign" element={<Navigate to="/system-design" replace />} />
-            <Route path="/github" element={<GitHubFOSS />} />
-            <Route path="/github-foss" element={<Navigate to="/github" replace />} />
-            <Route
-              path="/readiness"
-              element={
-                <PlacementReadiness
-                  dashboardData={dashboardHook.data}
-                  onNavigate={handleNavigate}
-                />
-              }
-            />
-            <Route path="/placement-readiness" element={<Navigate to="/readiness" replace />} />
-            <Route path="/settings" element={<Settings onRefreshAll={handleRefreshAll} />} />
-            <Route path="/login" element={<Navigate to="/dashboard" replace />} />
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
-          </Routes>
+          <ErrorBoundary>
+            <Routes>
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route
+                path="/dashboard"
+                element={
+                  <Dashboard
+                    dashboardData={dashboardHook.data}
+                    loading={dashboardHook.loading}
+                    onNavigate={handleNavigate}
+                    onRefreshAll={handleRefreshAll}
+                  />
+                }
+              />
+              <Route path="/dsa" element={<DSA dsaHook={dsaHook} />} />
+              <Route path="/webdev" element={<WebDevelopment progressHook={progressHook} />} />
+              <Route path="/web-development" element={<Navigate to="/webdev" replace />} />
+              <Route path="/system-design" element={<SystemDesign progressHook={progressHook} />} />
+              <Route path="/systemdesign" element={<Navigate to="/system-design" replace />} />
+              <Route path="/github" element={<GitHubFOSS />} />
+              <Route path="/github-foss" element={<Navigate to="/github" replace />} />
+              <Route
+                path="/readiness"
+                element={
+                  <PlacementReadiness
+                    dashboardData={dashboardHook.data}
+                    onNavigate={handleNavigate}
+                  />
+                }
+              />
+              <Route path="/placement-readiness" element={<Navigate to="/readiness" replace />} />
+              <Route path="/settings" element={<Settings onRefreshAll={handleRefreshAll} />} />
+              <Route path="/login" element={<Navigate to="/dashboard" replace />} />
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            </Routes>
+          </ErrorBoundary>
         </main>
       </div>
     </div>

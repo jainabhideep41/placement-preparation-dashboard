@@ -31,6 +31,7 @@ import { useLocalCache } from '../hooks/useLocalCache';
 import { 
   CANONICAL_STORAGE_KEY,
   ALL_UNIQUE_PROBLEMS,
+  CANONICAL_TO_SHEETS_MAP,
   getUniqueSolvedStats,
   getSheetSolvedCount,
   isProblemSolved,
@@ -249,64 +250,70 @@ export function DSA({ dsaHook }) {
 
   const handleDeleteMergedProblem = async (problem) => {
     if (!problem) return;
-    const canonKey = problem.canonicalKey || getCanonicalKey(problem);
-    const titleKey = 'title:' + (problem.title || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-
-    // Find any matching unique problem entry
-    const matchingUnique = ALL_UNIQUE_PROBLEMS.find(u => 
-      u.canonicalKey === canonKey || 
-      getCanonicalKey(u) === canonKey ||
-      (problem.title && u.title?.toLowerCase() === problem.title?.toLowerCase())
-    );
-
-    // 1. Scrub from canonical solved state across all alias keys
-    setCanonicalSolvedMap(prev => {
-      const next = { ...prev };
-      if (canonKey) delete next[canonKey];
-      if (titleKey) delete next[titleKey];
-      if (problem.canonicalKey) delete next[problem.canonicalKey];
-      if (problem.id) delete next[problem.id];
-      if (matchingUnique) {
-        delete next[matchingUnique.canonicalKey];
-        delete next[matchingUnique.id];
-        const refs = CANONICAL_TO_SHEETS_MAP[matchingUnique.canonicalKey] || [];
-        for (const ref of refs) {
-          delete next[ref.problemId];
-        }
-      }
-      return next;
-    });
-
-    // 2. Scrub from prep_revision_added_map in localStorage if present
     try {
-      const revRaw = localStorage.getItem('prep_revision_added_map');
-      if (revRaw) {
-        const revMap = JSON.parse(revRaw);
-        delete revMap[problem.id];
-        delete revMap[canonKey];
-        delete revMap[titleKey];
-        if (problem.canonicalKey) delete revMap[problem.canonicalKey];
+      const canonKey = problem.canonicalKey || getCanonicalKey(problem);
+      const titleKey = 'title:' + (problem.title || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+      // Find any matching unique problem entry
+      const matchingUnique = (ALL_UNIQUE_PROBLEMS || []).find(u => 
+        (canonKey && u.canonicalKey === canonKey) || 
+        (canonKey && getCanonicalKey(u) === canonKey) ||
+        (problem.title && u.title?.toLowerCase() === problem.title?.toLowerCase())
+      );
+
+      // 1. Scrub from canonical solved state across all alias keys
+      setCanonicalSolvedMap(prev => {
+        const next = { ...(prev || {}) };
+        if (canonKey) delete next[canonKey];
+        if (titleKey) delete next[titleKey];
+        if (problem.canonicalKey) delete next[problem.canonicalKey];
+        if (problem.id) delete next[problem.id];
         if (matchingUnique) {
-          delete revMap[matchingUnique.id];
-          delete revMap[matchingUnique.canonicalKey];
+          if (matchingUnique.canonicalKey) delete next[matchingUnique.canonicalKey];
+          if (matchingUnique.id) delete next[matchingUnique.id];
+          const refs = (CANONICAL_TO_SHEETS_MAP && matchingUnique.canonicalKey && CANONICAL_TO_SHEETS_MAP[matchingUnique.canonicalKey]) || [];
+          for (const ref of refs) {
+            if (ref?.problemId) {
+              delete next[ref.problemId];
+            }
+          }
         }
-        localStorage.setItem('prep_revision_added_map', JSON.stringify(revMap));
+        return next;
+      });
+
+      // 2. Scrub from prep_revision_added_map in localStorage if present
+      try {
+        const revRaw = localStorage.getItem('prep_revision_added_map');
+        if (revRaw) {
+          const revMap = JSON.parse(revRaw);
+          if (problem.id) delete revMap[problem.id];
+          if (canonKey) delete revMap[canonKey];
+          if (titleKey) delete revMap[titleKey];
+          if (problem.canonicalKey) delete revMap[problem.canonicalKey];
+          if (matchingUnique) {
+            if (matchingUnique.id) delete revMap[matchingUnique.id];
+            if (matchingUnique.canonicalKey) delete revMap[matchingUnique.canonicalKey];
+          }
+          localStorage.setItem('prep_revision_added_map', JSON.stringify(revMap));
+        }
+      } catch (e) {
+        // Ignore cache parse error
       }
-    } catch (e) {
-      // Ignore cache parse error
-    }
 
-    // 3. Remove from problem store & React state via deleteProblem
-    const matchingInAll = (allProblems || []).find(p => 
-      p.id === problem.id || 
-      (problem.title && p.title?.toLowerCase() === problem.title?.toLowerCase()) ||
-      (canonKey && getCanonicalKey(p) === canonKey)
-    );
+      // 3. Remove from problem store & React state via deleteProblem
+      const matchingInAll = (allProblems || []).find(p => 
+        (problem.id && p.id === problem.id) || 
+        (problem.title && p.title && p.title.toLowerCase() === problem.title.toLowerCase()) ||
+        (canonKey && getCanonicalKey(p) === canonKey)
+      );
 
-    if (matchingInAll?.id) {
-      await deleteProblem(matchingInAll.id);
-    } else if (problem.id) {
-      await deleteProblem(problem.id);
+      if (matchingInAll?.id) {
+        await deleteProblem(matchingInAll.id);
+      } else if (problem.id) {
+        await deleteProblem(problem.id);
+      }
+    } catch (err) {
+      console.error('Safe delete error:', err);
     }
   };
 
@@ -640,7 +647,12 @@ export function DSA({ dsaHook }) {
                             {p.revisionStatus === 'Done' ? 'Reviewed' : 'Mark Reviewed'}
                           </button>
                           <button
-                            onClick={() => handleDeleteMergedProblem(p)}
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              handleDeleteMergedProblem(p);
+                            }}
                             title="Delete task from review queue"
                             className="p-1.5 rounded-xl text-black/40 hover:text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200 transition-colors"
                           >
