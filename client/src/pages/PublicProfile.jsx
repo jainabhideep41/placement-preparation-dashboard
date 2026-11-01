@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, useSearchParams, Link, useNavigate } from 'react-router-dom';
 import {
   ShieldCheck,
   Award,
@@ -31,10 +31,13 @@ import { findUserByIdentifier } from '../utils/accountManager';
 
 export function PublicProfile({ currentUser }) {
   const { username } = useParams();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
-  // Determine target identifier
+  // Determine target identifier from path /u/:username or query /u?user=:username
+  const queryParam = searchParams.get('user') || searchParams.get('u') || searchParams.get('handle') || searchParams.get('id');
   const resolvedIdentifier = username || 
+    queryParam ||
     currentUser?.handles?.leetcode || 
     currentUser?.handles?.github || 
     currentUser?.name || 
