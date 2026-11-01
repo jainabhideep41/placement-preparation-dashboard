@@ -5,10 +5,8 @@ import {
   ServerCog, 
   GitBranch, 
   Sparkles, 
-  AlertTriangle, 
   CheckCircle2, 
   ArrowUpRight, 
-  Clock, 
   Flame, 
   TrendingUp,
   Settings2,
@@ -23,6 +21,8 @@ import { Badge } from '../components/common/Badge';
 import { DifficultyDistribution, DonutChart } from '../components/common/Charts';
 import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
 import { RatingGraph } from '../components/dashboard/RatingGraph';
+import { PlacementSprintCard } from '../components/dashboard/PlacementSprintCard';
+import { SpacedRepetitionCard } from '../components/dashboard/SpacedRepetitionCard';
 import { HandleConfigModal } from '../components/dashboard/HandleConfigModal';
 import { useLocalCache } from '../hooks/useLocalCache';
 import { saveUserToRegistry } from '../utils/accountManager';
@@ -300,161 +300,24 @@ export function Dashboard({ dashboardData, loading, onNavigate, onRefreshAll }) 
 
       {/* 4. Two-Column Modular Workspace: Action vs Retention */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        
         {/* Left Column: Weak Area Engine & Placement Sprint (7 Cols) */}
-        <div className="lg:col-span-7 rounded-2xl bg-white border border-gray-200/90 shadow-xs p-5 lg:p-6 space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-gray-100">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-gray-100 text-gray-900 flex items-center justify-center font-bold">
-                <AlertTriangle className="w-4 h-4 text-amber-600" />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-gray-900 tracking-tight">
-                  Placement Sprint Actions
-                </h3>
-                <p className="text-[11px] text-gray-500">
-                  Prioritized recommendations to maximize placement readiness score
-                </p>
-              </div>
-            </div>
-            <span className="text-[10px] font-bold uppercase tracking-wider bg-gray-100 text-gray-800 px-2 py-0.5 rounded-full">
-              Automated Diagnostic
-            </span>
-          </div>
-
-          {/* Weak vs Strong Summary Strip */}
-          <div className="grid grid-cols-2 gap-3 p-3 rounded-xl bg-gray-50 border border-gray-100 text-xs">
-            <div>
-              <span className="text-[10px] uppercase font-mono tracking-wider font-semibold text-gray-500 block mb-0.5">
-                Primary Opportunity
-              </span>
-              <span className="font-bold text-gray-900 font-mono">
-                {weakestArea?.name || 'DSA Practice'} ({weakestArea?.score ?? 0}%)
-              </span>
-            </div>
-            <div className="text-right">
-              <span className="text-[10px] uppercase font-mono tracking-wider font-semibold text-gray-500 block mb-0.5">
-                Strongest Pillar
-              </span>
-              <span className="font-bold text-emerald-700 font-mono">
-                {strongestArea?.name || 'DSA Practice'} ({strongestArea?.score ?? 0}%)
-              </span>
-            </div>
-          </div>
-
-          {/* Action Sprint List */}
-          <div className="space-y-2">
-            {recommendations && recommendations.length > 0 ? (
-              recommendations.slice(0, 3).map((rec, idx) => (
-                <div
-                  key={idx}
-                  className="p-3 rounded-xl border border-gray-200 hover:border-gray-400 bg-white transition-all flex items-start justify-between gap-3 shadow-2xs"
-                >
-                  <div className="flex items-start gap-2.5">
-                    <span className="w-5 h-5 rounded-md bg-black text-white text-[10px] font-mono font-bold flex items-center justify-center flex-shrink-0 mt-0.5">
-                      {idx + 1}
-                    </span>
-                    <div>
-                      <p className="text-xs font-semibold text-gray-900 leading-snug">
-                        {rec.action}
-                      </p>
-                      <span className="text-[10px] text-gray-500 font-mono mt-0.5 block">
-                        Focus Pillar: {rec.pillar}
-                      </span>
-                    </div>
-                  </div>
-                  <span className={`text-[10px] font-bold font-mono px-2 py-0.5 rounded ${
-                    rec.priority === 'High'
-                      ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                      : 'bg-amber-50 text-amber-700 border border-amber-200'
-                  }`}>
-                    {rec.priority}
-                  </span>
-                </div>
-              ))
-            ) : (
-              <div className="p-4 text-center text-xs text-gray-400 font-mono rounded-xl border border-dashed border-gray-200">
-                Link handles to receive targeted algorithm recommendations.
-              </div>
-            )}
-          </div>
+        <div className="lg:col-span-7">
+          <PlacementSprintCard
+            weakestArea={weakestArea}
+            strongestArea={strongestArea}
+            recommendations={recommendations}
+            onNavigate={onNavigate}
+          />
         </div>
 
-        {/* Right Column: Spaced Repetition Due Queue (5 Cols) */}
-        <div className="lg:col-span-5 rounded-2xl bg-white border border-gray-200/90 shadow-xs p-5 lg:p-6 space-y-4 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-gray-100 text-gray-900 flex items-center justify-center font-bold">
-                  <Clock className="w-4 h-4 text-gray-700" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-gray-900 tracking-tight">
-                    Spaced Repetition
-                  </h3>
-                  <p className="text-[11px] text-gray-500">
-                    Problems scheduled for retention review today
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => onNavigate('dsa')}
-                className="text-xs font-bold text-gray-900 hover:underline flex items-center gap-0.5"
-              >
-                Tracker &rarr;
-              </button>
-            </div>
-
-            {/* List of due problems */}
-            <div className="space-y-2 pt-3">
-              {dueRevisions && dueRevisions.length > 0 ? (
-                dueRevisions.slice(0, 3).map((prob) => (
-                  <div 
-                    key={prob.id} 
-                    className="p-3 rounded-xl bg-gray-50 border border-gray-200 flex items-center justify-between text-xs"
-                  >
-                    <div className="truncate pr-2">
-                      <span className="font-semibold text-gray-900 block truncate">{prob.title}</span>
-                      <span className="text-[10px] font-mono text-gray-500">{prob.platform} &bull; {prob.topic}</span>
-                    </div>
-                    <span className="text-[10px] font-bold font-mono px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 flex-shrink-0">
-                      Due ({prob.revisionInterval || '7d'})
-                    </span>
-                  </div>
-                ))
-              ) : (
-                <div className="py-6 px-4 text-center rounded-xl bg-gray-50 border border-dashed border-gray-200 space-y-1">
-                  <CheckCircle2 className="w-6 h-6 text-emerald-600 mx-auto" />
-                  <p className="text-xs font-bold text-gray-900">No revisions due today</p>
-                  <p className="text-[11px] text-gray-500">
-                    Your retention queue is clear. Track new problems in DSA to start your next cycle.
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Quick Benchmark footer card */}
-          <div className="p-3 rounded-xl bg-gray-50 border border-gray-200 text-xs flex items-center justify-between">
-            <div>
-              <span className="text-[10px] font-mono text-gray-500 uppercase tracking-wider block font-semibold">
-                Algorithmic Difficulty Mix
-              </span>
-              <span className="font-mono text-xs text-gray-800">
-                {metrics?.easy || 0} Easy &bull; {metrics?.medium || 0} Medium &bull; {metrics?.hard || 0} Hard
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={() => onNavigate('dsa')}
-              className="text-[11px] font-semibold text-gray-900 hover:underline"
-            >
-              Analyze &rarr;
-            </button>
-          </div>
+        {/* Right Column: Spaced Repetition Due Queue & Difficulty Mix (5 Cols) */}
+        <div className="lg:col-span-5">
+          <SpacedRepetitionCard
+            dueRevisions={dueRevisions}
+            metrics={metrics}
+            onNavigate={onNavigate}
+          />
         </div>
-
       </div>
 
       {/* Handle Configuration Modal */}
