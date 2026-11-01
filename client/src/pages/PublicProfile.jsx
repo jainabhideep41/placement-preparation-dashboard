@@ -29,9 +29,11 @@ import {
   GraduationCap,
   Building2,
   Settings as SettingsIcon,
-  Edit3
+  Edit3,
+  FileText
 } from 'lucide-react';
 import { findUserByIdentifier } from '../utils/accountManager';
+import { JakeResumeModal } from '../components/profile/JakeResumeModal';
 
 export function PublicProfile({ currentUser }) {
   const { username } = useParams();
@@ -59,6 +61,7 @@ export function PublicProfile({ currentUser }) {
   const [error, setError] = useState(null);
   const [copied, setCopied] = useState(false);
   const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'dsa' | 'projects' | 'system-design'
+  const [showResumeModal, setShowResumeModal] = useState(searchParams.get('resume') === 'true');
 
   useEffect(() => {
     let isMounted = true;
@@ -295,11 +298,20 @@ export function PublicProfile({ currentUser }) {
             </button>
 
             <button
+              onClick={() => setShowResumeModal(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-black hover:bg-neutral-800 text-white border-2 border-black rounded font-mono text-xs font-bold shadow-[2px_2px_0px_0px_#000] transition-all active:translate-x-0.5 active:translate-y-0.5 cursor-pointer"
+              title="Download ATS Resume in Jake's Overleaf Format"
+            >
+              <FileText className="w-3.5 h-3.5 text-amber-300" />
+              <span>Jake&apos;s Resume</span>
+            </button>
+
+            <button
               onClick={handlePrint}
               className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-white border-2 border-black rounded font-mono text-xs font-bold shadow-[2px_2px_0px_0px_#000] hover:bg-black hover:text-white transition-all active:translate-x-0.5 active:translate-y-0.5"
             >
               <Printer className="w-3.5 h-3.5" />
-              <span>Export PDF</span>
+              <span>Export Dossier</span>
             </button>
 
             {currentUser ? (
@@ -493,6 +505,15 @@ export function PublicProfile({ currentUser }) {
                   style={{ width: `${Math.min(100, profile.readiness?.overallScore || 0)}%` }}
                 />
               </div>
+
+              <button
+                type="button"
+                onClick={() => setShowResumeModal(true)}
+                className="w-full mt-4 py-2 bg-white text-black hover:bg-neutral-100 rounded-lg font-mono text-xs font-bold transition-all border border-black shadow-[2px_2px_0px_0px_#444] active:translate-x-0.5 active:translate-y-0.5 flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <FileText className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Download Resume (Jake&apos;s ATS)</span>
+              </button>
             </div>
           </div>
 
@@ -976,18 +997,25 @@ export function PublicProfile({ currentUser }) {
             </p>
           </div>
 
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex items-center gap-3 shrink-0 flex-wrap">
+            <button
+              onClick={() => setShowResumeModal(true)}
+              className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-black font-mono text-xs font-bold rounded border-2 border-emerald-400 transition-colors shadow-[2px_2px_0px_0px_#444] flex items-center gap-1.5 cursor-pointer"
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span>Jake&apos;s ATS Resume</span>
+            </button>
             <button
               onClick={handleShare}
               className="px-4 py-2 bg-white text-black font-mono text-xs font-bold rounded border-2 border-white hover:bg-neutral-100 transition-colors shadow-[2px_2px_0px_0px_#444]"
             >
-              {copied ? 'Link Copied!' : 'Share Candidate Dossier'}
+              {copied ? 'Link Copied!' : 'Share Dossier'}
             </button>
             <button
               onClick={handlePrint}
               className="px-4 py-2 bg-transparent text-white font-mono text-xs font-bold rounded border-2 border-white hover:bg-white/10 transition-colors"
             >
-              Print / Save PDF
+              Print Page
             </button>
           </div>
         </section>
@@ -997,6 +1025,13 @@ export function PublicProfile({ currentUser }) {
           <p>© 2026 PrepStack Placement Preparation Engine. Built for Tier-1 engineering excellence.</p>
         </footer>
       </main>
+
+      {/* Jake's Resume ATS Modal */}
+      <JakeResumeModal 
+        isOpen={showResumeModal} 
+        onClose={() => setShowResumeModal(false)} 
+        profile={profile} 
+      />
     </div>
   );
 }
