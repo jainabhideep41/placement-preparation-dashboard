@@ -34,6 +34,25 @@ export function LandingPage({ isLoggedIn = false }) {
   return (
     <div className="min-h-screen bg-[#F8F8F6] text-black font-sans antialiased selection:bg-black selection:text-white">
       
+      {/* 0. TOP BRAND ANNOUNCEMENT BAR */}
+      <div className="bg-black text-white text-[11px] font-mono py-1.5 px-4 text-center border-b border-black flex items-center justify-center gap-2 select-none">
+        <span className="font-extrabold tracking-wide uppercase text-emerald-400 flex items-center gap-1">
+          <Sparkles className="w-3 h-3 text-emerald-400 animate-pulse" />
+          PREPSTACK 2.0
+        </span>
+        <span className="text-white/30 hidden sm:inline">/</span>
+        <span className="text-white/80 font-medium hidden sm:inline">The Engineering Placement Operating System</span>
+        <span className="text-white/30 hidden sm:inline">•</span>
+        <span className="text-white/90 font-bold">Free &amp; Open Access</span>
+        <Link
+          to={isLoggedIn ? "/dashboard" : "/login?mode=register"}
+          className="ml-2 hidden md:inline-flex items-center gap-1 text-emerald-400 hover:text-emerald-300 font-bold underline transition-colors"
+        >
+          <span>Explore Platform</span>
+          <ArrowRight className="w-3 h-3" />
+        </Link>
+      </div>
+
       {/* 1. TOP NAVIGATION BAR */}
       <header className="sticky top-0 z-40 w-full bg-white/95 backdrop-blur-md border-b-2 border-black">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
@@ -114,12 +133,24 @@ export function LandingPage({ isLoggedIn = false }) {
         {/* Subtle grid pattern background */}
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#00000008_1px,transparent_1px),linear-gradient(to_bottom,#00000008_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none" />
 
+        {/* Ambient Brand Watermark in Hero Background */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[14vw] font-black font-display uppercase tracking-tighter text-black/[0.025] select-none pointer-events-none whitespace-nowrap z-0">
+          PREPSTACK
+        </div>
+
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10 space-y-6">
           
-          {/* Top Pill Badge */}
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-50 text-emerald-950 border border-emerald-300 text-xs font-mono font-bold tracking-tight shadow-xs">
-            <Sparkles className="w-3.5 h-3.5 text-emerald-600 animate-pulse" />
-            <span>The Engineering Placement Operating System • Free &amp; Open Access</span>
+          {/* Top Brand Pill Badge */}
+          <div className="inline-flex items-center gap-2 p-1 pr-3.5 rounded-full bg-white border-2 border-black text-xs font-mono font-bold tracking-tight shadow-[3px_3px_0px_#000] hover:shadow-[1px_1px_0px_#000] active:translate-y-0.5 transition-all">
+            <span className="px-2.5 py-0.5 rounded-full bg-black text-white text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-2xs">
+              <Terminal className="w-3 h-3 text-emerald-400" />
+              <span>PREPSTACK</span>
+            </span>
+            <span className="text-black/85 font-semibold">The Engineering Placement Operating System</span>
+            <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-extrabold uppercase">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              Free &amp; Open Access
+            </span>
           </div>
 
           {/* Headline */}
@@ -130,7 +161,7 @@ export function LandingPage({ isLoggedIn = false }) {
 
           {/* Subtitle */}
           <p className="text-base sm:text-xl text-black/70 max-w-3xl mx-auto leading-relaxed font-medium">
-            The unified platform combining <strong>365 deduplicated master DSA problems</strong> across Striver, Blind 75 &amp; NeetCode 150, FAANG High-Level System Design blueprints, live LeetCode/Codeforces tracking, and Jake&apos;s ATS Resume Generator.
+            <strong>PrepStack</strong> is the unified platform combining <strong>365 deduplicated master DSA problems</strong> across Striver, Blind 75 &amp; NeetCode 150, FAANG High-Level System Design blueprints, live LeetCode/Codeforces tracking, and Jake&apos;s ATS Resume Generator.
           </p>
 
           {/* Action Button Row */}
