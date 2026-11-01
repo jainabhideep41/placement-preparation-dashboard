@@ -31,7 +31,6 @@ import {
   Shield
 } from 'lucide-react';
 import { useLocalCache } from '../hooks/useLocalCache';
-import { Badge } from '../components/common/Badge';
 import { saveUserToRegistry } from '../utils/accountManager';
 
 export function Settings({ onRefreshAll }) {

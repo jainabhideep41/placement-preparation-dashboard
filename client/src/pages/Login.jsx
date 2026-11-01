@@ -56,7 +56,13 @@ function GitHubIcon({ className = "w-5 h-5" }) {
 }
 
 export function Login({ onLogin }) {
-  const [isRegistering, setIsRegistering] = useState(false);
+  const [isRegistering, setIsRegistering] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const p = new URLSearchParams(window.location.search);
+      return p.get('mode') === 'register' || p.get('tab') === 'register' || p.get('signup') === 'true';
+    }
+    return false;
+  });
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');

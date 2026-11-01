@@ -11,6 +11,7 @@ import { PlacementReadiness } from './pages/PlacementReadiness';
 import { Settings } from './pages/Settings';
 import { Login } from './pages/Login';
 import { PublicProfile } from './pages/PublicProfile';
+import { LandingPage } from './pages/LandingPage';
 import { OnboardingModal } from './components/common/OnboardingModal';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { findUserByEmail, saveUserToRegistry } from './utils/accountManager';
@@ -200,16 +201,18 @@ export function App() {
     currentUser?.handles?.leetcode || 
     'demo';
 
-  // If student is not logged in, permit public profile viewing or show Login
+  // If student is not logged in, permit landing homepage, public profile viewing, or show Login
   if (!currentUser) {
     return (
       <Routes>
+        <Route path="/" element={<LandingPage isLoggedIn={false} />} />
+        <Route path="/home" element={<LandingPage isLoggedIn={false} />} />
         <Route path="/u/:username" element={<PublicProfile currentUser={null} />} />
         <Route path="/profile/:username" element={<PublicProfile currentUser={null} />} />
         <Route path="/u" element={<Navigate to="/u/demo" replace />} />
         <Route path="/profile" element={<Navigate to="/u/demo" replace />} />
         <Route path="/login" element={<Login onLogin={handleLogin} />} />
-        <Route path="*" element={<Login onLogin={handleLogin} />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     );
   }
@@ -224,6 +227,11 @@ export function App() {
         <Route path="/profile" element={<Navigate to={`/u/${encodeURIComponent(userHandle)}`} replace />} />
       </Routes>
     );
+  }
+
+  // Standalone landing page view for logged-in user visiting /home
+  if (location.pathname === '/home') {
+    return <LandingPage isLoggedIn={true} />;
   }
 
   const readinessScore = dashboardHook.data?.readiness?.overallScore || 0;

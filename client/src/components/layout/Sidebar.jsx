@@ -169,6 +169,20 @@ export function Sidebar({
                 </Link>
               );
             })}
+
+            {/* Product Homepage link */}
+            <div className="pt-2 border-t border-black/10">
+              <Link
+                to="/home"
+                className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-mono font-bold text-black/60 hover:text-black hover:bg-black/5 transition-all"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Globe2 className="w-4 h-4 text-black/50" />
+                  <span>Platform Home</span>
+                </div>
+                <ExternalLink className="w-3 h-3 text-black/40" />
+              </Link>
+            </div>
           </nav>
         </div>
 
