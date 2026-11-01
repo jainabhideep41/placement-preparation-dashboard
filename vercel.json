@@ -18,6 +18,14 @@
       }
     },
     {
+      "source": "/u/(.*)",
+      "destination": "/u"
+    },
+    {
+      "source": "/profile/(.*)",
+      "destination": "/profile"
+    },
+    {
       "source": "/(.*)",
       "destination": {
         "service": "client"
