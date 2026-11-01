@@ -11,7 +11,7 @@ import { calculateReadiness } from '../services/readiness.service.js';
 const router = Router();
 
 router.get('/', async (req, res) => {
-  const { cf_user = '', lc_user = '', gh_user = '', ac_user = '', hr_user = '' } = req.query;
+  const { cf_user = '', lc_user = '', gh_user = '', ac_user = '', hr_user = '', role = '', targetRole = '' } = req.query;
 
   try {
     // Concurrent fetch of all platform services (Section 12: Parallel API Requests)
@@ -37,7 +37,8 @@ router.get('/', async (req, res) => {
       dsa: dsaPayload,
       webDev: defaultWebDevData,
       systemDesign: defaultSystemDesignData,
-      github: ghStats
+      github: ghStats,
+      targetRole: role || targetRole || 'Software Development Engineer (SDE-1)'
     });
 
     const totalSolved = (lcStats.problemsSolved || 0) + 

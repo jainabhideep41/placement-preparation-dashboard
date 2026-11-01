@@ -34,12 +34,25 @@ export function saveUserToRegistry(user) {
     user.provider || 'email'
   ]));
 
+  const defaultUsername = (user.username || existing?.username || emailKey.split('@')[0]).replace(/[^a-z0-9_-]/gi, '').toLowerCase();
+
   const merged = {
     id: existing?.id || user.id || `usr_${Date.now()}`,
     email: emailKey,
+    username: user.username || existing?.username || defaultUsername,
     name: user.name || existing?.name || emailKey.split('@')[0],
     avatarUrl: user.avatarUrl || existing?.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || emailKey.split('@')[0])}&background=111&color=fff`,
     targetRole: user.targetRole || existing?.targetRole || 'Software Development Engineer (SDE-1)',
+    academic: {
+      college: user.academic?.college ?? existing?.academic?.college ?? 'Chandigarh University',
+      degree: user.academic?.degree ?? existing?.academic?.degree ?? 'B.Tech Computer Science & Engineering',
+      branch: user.academic?.branch ?? existing?.academic?.branch ?? 'Computer Science',
+      year: user.academic?.year ?? existing?.academic?.year ?? '2026 (Final Year)',
+      cgpa: user.academic?.cgpa ?? existing?.academic?.cgpa ?? '8.85 / 10',
+      desiredOption: user.academic?.desiredOption ?? existing?.academic?.desiredOption ?? (user.targetRole || existing?.targetRole || 'Software Development Engineer (SDE-1)'),
+      dreamCompanies: user.academic?.dreamCompanies ?? existing?.academic?.dreamCompanies ?? 'Google, Microsoft, Uber, Atlassian',
+      workMode: user.academic?.workMode ?? existing?.academic?.workMode ?? 'Hybrid / Remote / On-site'
+    },
     providers: updatedProviders,
     provider: user.provider || existing?.provider || 'email',
     password: user.password || existing?.password || null,
@@ -91,8 +104,9 @@ export function findUserByIdentifier(identifier) {
   // 1. Direct email match
   if (users[rawId]) return users[rawId];
 
-  // 2. Loop values
+  // 2. Loop values: check username first
   for (const user of Object.values(users)) {
+    if (user.username?.toLowerCase() === rawId) return user;
     if (user.id?.toLowerCase() === rawId) return user;
     if (user.email?.split('@')[0]?.toLowerCase() === rawId) return user;
     if (user.name?.trim().toLowerCase() === rawId) return user;

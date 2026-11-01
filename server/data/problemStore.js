@@ -29,6 +29,13 @@ export function getDueProblems() {
   return storedProblems.filter(p => p.revisionStatus === 'Due');
 }
 
+export function deleteProblemFromStore(id) {
+  const index = storedProblems.findIndex(p => p.id === id);
+  if (index === -1) return false;
+  storedProblems.splice(index, 1);
+  return true;
+}
+
 export function clearProblemStore() {
   storedProblems = [];
 }

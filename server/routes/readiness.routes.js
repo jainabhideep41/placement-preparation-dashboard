@@ -8,7 +8,7 @@ import { calculateReadiness } from '../services/readiness.service.js';
 const router = Router();
 
 router.get('/', async (req, res) => {
-  const { cf_user = '', lc_user = '', gh_user = '' } = req.query;
+  const { cf_user = '', lc_user = '', gh_user = '', role = '', targetRole = '' } = req.query;
 
   try {
     const [cf, lc, gh] = await Promise.all([
@@ -30,7 +30,8 @@ router.get('/', async (req, res) => {
       dsa: dsaPayload,
       webDev: defaultWebDevData,
       systemDesign: defaultSystemDesignData,
-      github: gh
+      github: gh,
+      targetRole: role || targetRole || 'Software Development Engineer (SDE-1)'
     });
 
     res.json({

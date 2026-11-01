@@ -4,7 +4,7 @@ import { striverSdeSheet } from '../data/striverSdeSheet.js';
 import { blind75Sheet } from '../data/blind75Sheet.js';
 import { neetcode150Sheet } from '../data/neetcode150Sheet.js';
 import { cpEssentialsSheet } from '../data/cpEssentialsSheet.js';
-import { getStoredProblems, addProblemToStore, updateProblemInStore } from '../data/problemStore.js';
+import { getStoredProblems, addProblemToStore, updateProblemInStore, deleteProblemFromStore } from '../data/problemStore.js';
 import { getCodeforcesStats } from '../services/dsa/codeforces.adapter.js';
 import { getLeetCodeStats } from '../services/dsa/leetcode.adapter.js';
 import { getAtCoderStats } from '../services/dsa/atcoder.adapter.js';
@@ -297,6 +297,16 @@ router.patch('/problems/:id', (req, res) => {
   }
 
   res.json({ success: true, problem: updated });
+});
+
+router.delete('/problems/:id', (req, res) => {
+  const { id } = req.params;
+  const deleted = deleteProblemFromStore(id);
+  if (!deleted) {
+    return res.status(404).json({ success: false, message: 'Problem not found in review queue' });
+  }
+
+  res.json({ success: true, message: 'Problem successfully removed from review queue', id });
 });
 
 export default router;

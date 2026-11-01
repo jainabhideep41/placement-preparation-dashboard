@@ -25,7 +25,9 @@ import {
   Globe,
   ChevronRight,
   Sparkles,
-  UserCheck
+  UserCheck,
+  GraduationCap,
+  Building2
 } from 'lucide-react';
 import { findUserByIdentifier } from '../utils/accountManager';
 
@@ -423,8 +425,79 @@ export function PublicProfile({ currentUser }) {
           )}
         </section>
 
+        {/* Academic & Education Credentials Card */}
+        {profile.academic && (
+          <section className="bg-white border-2 border-black rounded-xl p-5 sm:p-6 shadow-[4px_4px_0px_0px_#000] space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b-2 border-black/10">
+              <div className="flex items-center gap-2">
+                <GraduationCap className="w-5 h-5 text-black" />
+                <h2 className="text-base sm:text-lg font-black tracking-tight">Academic & Candidate Dossier</h2>
+              </div>
+              <div className="flex items-center gap-2">
+                {profile.academic.cgpa && (
+                  <span className="font-mono text-xs font-black px-2.5 py-1 bg-emerald-100 text-emerald-950 border border-emerald-600 rounded">
+                    CGPA: {profile.academic.cgpa}
+                  </span>
+                )}
+                <span className="font-mono text-xs font-bold px-2 py-0.5 bg-neutral-100 border border-black rounded">
+                  {profile.academic.year || '2026 Batch'}
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+              <div className="p-3 bg-[#F9F9F7] border border-black/20 rounded-lg space-y-1">
+                <span className="font-mono text-[10px] uppercase font-bold text-black/50 block">College / University</span>
+                <span className="font-bold text-black text-xs sm:text-sm flex items-center gap-1.5">
+                  <Building2 className="w-3.5 h-3.5 text-black/60 shrink-0" />
+                  <span className="truncate">{profile.academic.college || 'Chandigarh University'}</span>
+                </span>
+              </div>
+
+              <div className="p-3 bg-[#F9F9F7] border border-black/20 rounded-lg space-y-1">
+                <span className="font-mono text-[10px] uppercase font-bold text-black/50 block">Degree & Major</span>
+                <span className="font-bold text-black text-xs sm:text-sm flex items-center gap-1.5">
+                  <GraduationCap className="w-3.5 h-3.5 text-black/60 shrink-0" />
+                  <span className="truncate">{profile.academic.degree || 'B.Tech Computer Science'}</span>
+                </span>
+              </div>
+
+              <div className="p-3 bg-[#F9F9F7] border border-black/20 rounded-lg space-y-1">
+                <span className="font-mono text-[10px] uppercase font-bold text-black/50 block">Desired Placement Option</span>
+                <span className="font-bold text-blue-900 text-xs sm:text-sm flex items-center gap-1.5">
+                  <Briefcase className="w-3.5 h-3.5 text-blue-700 shrink-0" />
+                  <span className="truncate">{profile.academic.desiredOption || profile.targetRole}</span>
+                </span>
+              </div>
+
+              <div className="p-3 bg-[#F9F9F7] border border-black/20 rounded-lg space-y-1">
+                <span className="font-mono text-[10px] uppercase font-bold text-black/50 block">Target Recruiters / Companies</span>
+                <span className="font-bold text-black text-xs sm:text-sm flex items-center gap-1.5">
+                  <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500 shrink-0" />
+                  <span className="truncate">{profile.academic.dreamCompanies || 'Google, Atlassian, Uber'}</span>
+                </span>
+              </div>
+            </div>
+          </section>
+        )}
+
         {/* 5-Pillar Competency Radar / Overview Cards */}
-        <section className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
+        <section className="space-y-3">
+          {profile.readiness?.calibratedRole && (
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-white border border-black rounded-lg text-xs font-mono">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-amber-500 shrink-0" />
+                <span className="font-bold text-black">
+                  Calibrated for: {profile.readiness.calibratedRole.title}
+                </span>
+              </div>
+              <span className="text-[11px] text-neutral-600">
+                {profile.readiness.calibratedRole.rationale}
+              </span>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
           {profile.readiness?.pillars?.map((p, i) => (
             <div
               key={i}
@@ -454,6 +527,7 @@ export function PublicProfile({ currentUser }) {
               </div>
             </div>
           ))}
+          </div>
         </section>
 
         {/* Navigation Tabs for Profile Deep-Dive */}

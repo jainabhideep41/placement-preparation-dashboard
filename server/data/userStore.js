@@ -75,8 +75,9 @@ export function findUserByIdentifier(identifier) {
     return usersByEmail.get(rawId);
   }
 
-  // 2. Loop through users
+  // 2. Loop through users: match username first, then handles, name, email prefix
   for (const user of usersByEmail.values()) {
+    if (user.username?.toLowerCase() === rawId) return user;
     if (user.id?.toLowerCase() === rawId) return user;
     if (user.email?.split('@')[0]?.toLowerCase() === rawId) return user;
     if (user.name?.trim().toLowerCase() === rawId) return user;
@@ -97,6 +98,7 @@ export function saveOrMergeUser(userData) {
 
   loadUsersFromDisk();
   const existing = usersByEmail.get(emailKey);
+  const defaultUsername = (userData.username || existing?.username || emailKey.split('@')[0]).replace(/[^a-z0-9_-]/gi, '').toLowerCase();
 
   if (existing) {
     // Merge existing user
@@ -107,9 +109,20 @@ export function saveOrMergeUser(userData) {
 
     const mergedUser = {
       ...existing,
+      username: userData.username || existing.username || defaultUsername,
       name: userData.name || existing.name,
       avatarUrl: userData.avatarUrl || existing.avatarUrl,
       targetRole: userData.targetRole || existing.targetRole || 'Software Development Engineer (SDE-1)',
+      academic: {
+        college: userData.academic?.college ?? existing.academic?.college ?? 'Chandigarh University',
+        degree: userData.academic?.degree ?? existing.academic?.degree ?? 'B.Tech Computer Science & Engineering',
+        branch: userData.academic?.branch ?? existing.academic?.branch ?? 'Computer Science',
+        year: userData.academic?.year ?? existing.academic?.year ?? '2026 (Final Year)',
+        cgpa: userData.academic?.cgpa ?? existing.academic?.cgpa ?? '8.85 / 10',
+        desiredOption: userData.academic?.desiredOption ?? existing.academic?.desiredOption ?? (userData.targetRole || existing.targetRole || 'Software Development Engineer (SDE-1)'),
+        dreamCompanies: userData.academic?.dreamCompanies ?? existing.academic?.dreamCompanies ?? 'Google, Microsoft, Uber, Atlassian',
+        workMode: userData.academic?.workMode ?? existing.academic?.workMode ?? 'Hybrid / Remote / On-site'
+      },
       providers: updatedProviders,
       provider: userData.provider || existing.provider,
       password: userData.password || existing.password || null,
@@ -135,12 +148,23 @@ export function saveOrMergeUser(userData) {
   const newUser = {
     id: userData.id || `usr_${Date.now()}`,
     email: emailKey,
+    username: defaultUsername,
     name: userData.name || emailKey.split('@')[0],
     password: userData.password || null,
     emailVerified: userData.emailVerified || (userData.provider === 'google' || userData.provider === 'github'),
     welcomeEmailSent: userData.welcomeEmailSent || false,
     avatarUrl: userData.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.name || emailKey.split('@')[0])}&background=111&color=fff`,
     targetRole: userData.targetRole || 'Software Development Engineer (SDE-1)',
+    academic: {
+      college: userData.academic?.college || 'Chandigarh University',
+      degree: userData.academic?.degree || 'B.Tech Computer Science & Engineering',
+      branch: userData.academic?.branch || 'Computer Science',
+      year: userData.academic?.year || '2026 (Final Year)',
+      cgpa: userData.academic?.cgpa || '8.85 / 10',
+      desiredOption: userData.academic?.desiredOption || (userData.targetRole || 'Software Development Engineer (SDE-1)'),
+      dreamCompanies: userData.academic?.dreamCompanies || 'Google, Microsoft, Uber, Atlassian',
+      workMode: userData.academic?.workMode || 'Hybrid / Remote / On-site'
+    },
     providers: [userData.provider || 'email'],
     provider: userData.provider || 'email',
     handles: {
@@ -156,6 +180,52 @@ export function saveOrMergeUser(userData) {
   usersByEmail.set(emailKey, newUser);
   persistUsersToDisk();
   return newUser;
+}
+
+/**
+ * Update user profile details including public username, academic details, and target role
+ */
+export function updateUserProfile(email, profileData = {}) {
+  const key = normalizeEmail(email);
+  loadUsersFromDisk();
+  let user = usersByEmail.get(key);
+  if (!user) {
+    user = saveOrMergeUser({ email: key, ...profileData });
+  }
+
+  if (profileData.username) {
+    const cleanUsername = profileData.username.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
+    if (cleanUsername) {
+      for (const [otherEmail, otherUser] of usersByEmail.entries()) {
+        if (otherEmail !== key && otherUser.username?.toLowerCase() === cleanUsername) {
+          throw new Error(`Username "${cleanUsername}" is already taken by another candidate.`);
+        }
+      }
+      user.username = cleanUsername;
+    }
+  }
+
+  if (profileData.name) user.name = profileData.name.trim();
+  if (profileData.targetRole) user.targetRole = profileData.targetRole.trim();
+  if (profileData.avatarUrl) user.avatarUrl = profileData.avatarUrl.trim();
+  if (profileData.handles) {
+    user.handles = {
+      leetcode: profileData.handles.leetcode?.trim() ?? user.handles.leetcode,
+      codeforces: profileData.handles.codeforces?.trim() ?? user.handles.codeforces,
+      github: profileData.handles.github?.trim() ?? user.handles.github
+    };
+  }
+  if (profileData.academic) {
+    user.academic = {
+      ...user.academic,
+      ...profileData.academic
+    };
+  }
+  user.updatedAt = new Date().toISOString();
+
+  usersByEmail.set(key, user);
+  persistUsersToDisk();
+  return user;
 }
 
 /**

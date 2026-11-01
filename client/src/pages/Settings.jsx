@@ -19,7 +19,11 @@ import {
   ExternalLink,
   Share2,
   Copy,
-  UserCheck
+  UserCheck,
+  GraduationCap,
+  Building2,
+  Calendar,
+  Briefcase
 } from 'lucide-react';
 import { useLocalCache } from '../hooks/useLocalCache';
 import { Badge } from '../components/common/Badge';
@@ -40,6 +44,23 @@ export function Settings({ onRefreshAll }) {
   const [cacheMessage, setCacheMessage] = useState('');
   const [syncing, setSyncing] = useState(false);
   const [profileCopied, setProfileCopied] = useState(false);
+
+  // Candidate Academic Profile & Target Role States
+  const [usernameInput, setUsernameInput] = useState(
+    currentUser?.username || currentUser?.email?.split('@')[0]?.replace(/[^a-z0-9_-]/gi, '') || ''
+  );
+  const [nameInput, setNameInput] = useState(currentUser?.name || '');
+  const [targetRoleInput, setTargetRoleInput] = useState(
+    currentUser?.targetRole || 'Software Development Engineer (SDE-1 — FAANG & Tier-1)'
+  );
+  const [collegeInput, setCollegeInput] = useState(currentUser?.academic?.college || 'Chandigarh University');
+  const [degreeInput, setDegreeInput] = useState(currentUser?.academic?.degree || 'B.Tech Computer Science & Engineering');
+  const [yearInput, setYearInput] = useState(currentUser?.academic?.year || '2026 (Final Year)');
+  const [cgpaInput, setCgpaInput] = useState(currentUser?.academic?.cgpa || '8.85 / 10');
+  const [dreamCompaniesInput, setDreamCompaniesInput] = useState(currentUser?.academic?.dreamCompanies || 'Google, Microsoft, Uber, Atlassian');
+  const [workModeInput, setWorkModeInput] = useState(currentUser?.academic?.workMode || 'Hybrid / Remote / On-site');
+  const [academicSavedSuccess, setAcademicSavedSuccess] = useState(false);
+  const [academicError, setAcademicError] = useState('');
 
   // Resend email state for settings
   const [resendCooldown, setResendCooldown] = useState(0);
@@ -78,6 +99,64 @@ export function Settings({ onRefreshAll }) {
       setResendLoading(false);
       setTimeout(() => setResendFeedback(''), 4000);
     }
+  };
+
+  const handleSaveAcademicProfile = async (e) => {
+    if (e) e.preventDefault();
+    setAcademicError('');
+    setAcademicSavedSuccess(false);
+
+    const cleanUsername = usernameInput.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
+    if (!cleanUsername) {
+      setAcademicError('Username cannot be empty and must be alphanumeric.');
+      return;
+    }
+
+    const updatedAcademic = {
+      college: collegeInput.trim(),
+      degree: degreeInput.trim(),
+      year: yearInput.trim(),
+      cgpa: cgpaInput.trim(),
+      desiredOption: targetRoleInput,
+      dreamCompanies: dreamCompaniesInput.trim(),
+      workMode: workModeInput
+    };
+
+    // 1. Save locally in registry & prep_auth_user
+    if (currentUser?.email) {
+      saveUserToRegistry({
+        ...currentUser,
+        username: cleanUsername,
+        name: nameInput.trim() || currentUser.name,
+        targetRole: targetRoleInput,
+        academic: updatedAcademic
+      });
+
+      // 2. Sync to backend API
+      try {
+        const res = await fetch('/api/auth/profile', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: currentUser.email,
+            username: cleanUsername,
+            name: nameInput.trim() || currentUser.name,
+            targetRole: targetRoleInput,
+            academic: updatedAcademic
+          })
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          throw new Error(data.message || 'Failed to update profile on server');
+        }
+      } catch (err) {
+        console.warn('Backend sync fallback:', err.message);
+      }
+    }
+
+    setAcademicSavedSuccess(true);
+    setTimeout(() => setAcademicSavedSuccess(false), 3500);
+    if (onRefreshAll) onRefreshAll();
   };
 
   const handleSaveHandles = async (e) => {
@@ -289,12 +368,228 @@ export function Settings({ onRefreshAll }) {
 
         <div className="p-3 bg-neutral-950 rounded-xl border border-neutral-800 flex items-center justify-between font-mono text-xs text-neutral-400 overflow-x-auto">
           <span className="truncate mr-3">
-            {typeof window !== 'undefined' ? `${window.location.origin}/u/${encodeURIComponent(currentUser?.handles?.leetcode || currentUser?.handles?.github || currentUser?.name || 'me')}` : `/u/${currentUser?.handles?.leetcode || 'me'}`}
+            {typeof window !== 'undefined' ? `${window.location.origin}/u/${encodeURIComponent(currentUser?.username || usernameInput || 'me')}` : `/u/${currentUser?.username || usernameInput || 'me'}`}
           </span>
           <span className="text-[10px] text-emerald-400 uppercase font-bold shrink-0">
             Recruiter Ready
           </span>
         </div>
+      </div>
+
+      {/* Candidate Academic Profile & Career Track Preferences */}
+      <div className="p-6 sm:p-7 rounded-3xl bg-white border-2 border-black space-y-6 shadow-[4px_4px_0px_rgba(0,0,0,1)]">
+        <div className="border-b border-black/10 pb-4">
+          <div className="flex items-center gap-2">
+            <GraduationCap className="w-5 h-5 text-black" />
+            <h2 className="text-base font-extrabold text-black font-display">
+              Candidate Academic Profile & Career Preferences
+            </h2>
+            <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold border border-emerald-300">
+              Verified Candidate
+            </span>
+          </div>
+          <p className="text-xs text-black/50 mt-0.5">
+            Customize your public username handle, academic credentials (CGPA, college, graduation year), and desired job track options displayed on your recruiter portfolio.
+          </p>
+        </div>
+
+        {academicSavedSuccess && (
+          <div className="p-4 rounded-2xl bg-emerald-50 border-2 border-emerald-400 text-xs text-emerald-900 font-bold flex items-center justify-between shadow-sm animate-fadeIn">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+              <span>Academic profile, public username, and career preferences saved successfully!</span>
+            </div>
+            <span className="font-mono text-[11px] text-emerald-700">Dossier Updated</span>
+          </div>
+        )}
+
+        {academicError && (
+          <div className="p-3.5 rounded-2xl bg-rose-50 border-2 border-rose-400 text-xs text-rose-900 font-bold flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+            <span>{academicError}</span>
+          </div>
+        )}
+
+        <form onSubmit={handleSaveAcademicProfile} className="space-y-4 text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Public Username */}
+            <div className="p-4 rounded-2xl bg-[#F9F9F7] border-2 border-black/15 space-y-1.5">
+              <label className="font-bold text-black flex items-center justify-between">
+                <span>Public Vanity Username</span>
+                <span className="font-mono text-[10px] text-black/50 font-semibold">Shareable URL handle</span>
+              </label>
+              <div className="flex items-center gap-1.5">
+                <span className="font-mono text-black/40 text-xs font-bold">/u/</span>
+                <input
+                  type="text"
+                  value={usernameInput}
+                  onChange={(e) => setUsernameInput(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ''))}
+                  placeholder="e.g. rahul_dev"
+                  className="w-full px-3 py-2 rounded-xl bg-white border border-black/20 text-xs font-mono font-bold text-black focus:outline-none focus:border-black"
+                />
+              </div>
+              <p className="font-mono text-[10px] text-black/50">
+                Live URL: {typeof window !== 'undefined' ? `${window.location.origin}/u/${usernameInput || 'username'}` : `/u/${usernameInput || 'username'}`}
+              </p>
+            </div>
+
+            {/* Candidate Full Name */}
+            <div className="p-4 rounded-2xl bg-[#F9F9F7] border-2 border-black/15 space-y-1.5">
+              <label className="font-bold text-black">Display Name</label>
+              <input
+                type="text"
+                value={nameInput}
+                onChange={(e) => setNameInput(e.target.value)}
+                placeholder="Candidate Full Name"
+                className="w-full px-3 py-2 rounded-xl bg-white border border-black/20 text-xs font-semibold text-black focus:outline-none focus:border-black"
+              />
+              <p className="text-[10px] text-black/50">Full legal or professional name shown on portfolio</p>
+            </div>
+
+            {/* College Name */}
+            <div className="p-4 rounded-2xl bg-[#F9F9F7] border-2 border-black/15 space-y-1.5">
+              <label className="font-bold text-black flex items-center gap-1.5">
+                <Building2 className="w-3.5 h-3.5 text-black/60" />
+                <span>College / University Name</span>
+              </label>
+              <input
+                type="text"
+                value={collegeInput}
+                onChange={(e) => setCollegeInput(e.target.value)}
+                placeholder="e.g. Chandigarh University, IIT Delhi"
+                className="w-full px-3 py-2 rounded-xl bg-white border border-black/20 text-xs font-semibold text-black focus:outline-none focus:border-black"
+              />
+            </div>
+
+            {/* Degree & Branch */}
+            <div className="p-4 rounded-2xl bg-[#F9F9F7] border-2 border-black/15 space-y-1.5">
+              <label className="font-bold text-black flex items-center gap-1.5">
+                <GraduationCap className="w-3.5 h-3.5 text-black/60" />
+                <span>Degree & Major / Branch</span>
+              </label>
+              <input
+                type="text"
+                value={degreeInput}
+                onChange={(e) => setDegreeInput(e.target.value)}
+                placeholder="e.g. B.Tech Computer Science & Engineering"
+                className="w-full px-3 py-2 rounded-xl bg-white border border-black/20 text-xs font-semibold text-black focus:outline-none focus:border-black"
+              />
+            </div>
+
+            {/* Graduation Year */}
+            <div className="p-4 rounded-2xl bg-[#F9F9F7] border-2 border-black/15 space-y-1.5">
+              <label className="font-bold text-black flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 text-black/60" />
+                <span>Graduation / Study Year</span>
+              </label>
+              <select
+                value={yearInput}
+                onChange={(e) => setYearInput(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl bg-white border border-black/20 text-xs font-semibold text-black focus:outline-none focus:border-black font-mono"
+              >
+                <option value="2026 (Final Year)">2026 (Final Year Student)</option>
+                <option value="2027 (Pre-final Year)">2027 (Pre-final Year Student)</option>
+                <option value="2028 (Sophomore)">2028 (Sophomore Year)</option>
+                <option value="2025 (Fresh Graduate)">2025 (Fresh Graduate)</option>
+                <option value="2024 (Experienced / Alumni)">2024 (Alumni / Experienced)</option>
+              </select>
+            </div>
+
+            {/* CGPA / Percentage */}
+            <div className="p-4 rounded-2xl bg-[#F9F9F7] border-2 border-black/15 space-y-1.5">
+              <label className="font-bold text-black flex items-center justify-between">
+                <span>CGPA / Academic Score</span>
+                <span className="font-mono text-[10px] text-emerald-700 font-bold">Academic Verified</span>
+              </label>
+              <input
+                type="text"
+                value={cgpaInput}
+                onChange={(e) => setCgpaInput(e.target.value)}
+                placeholder="e.g. 8.85 / 10 CGPA or 88%"
+                className="w-full px-3 py-2 rounded-xl bg-white border border-black/20 text-xs font-mono font-bold text-black focus:outline-none focus:border-black"
+              />
+            </div>
+          </div>
+
+          {/* Desired Career Option / Track Selection */}
+          <div className="p-4 rounded-2xl bg-[#F9F9F7] border-2 border-black/15 space-y-2">
+            <label className="font-bold text-black flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <Briefcase className="w-3.5 h-3.5 text-black/60" />
+                <span>Desired Placement Career Option (Calibrates Readiness Engine)</span>
+              </span>
+              <span className="font-mono text-[10px] text-blue-700 font-bold uppercase">
+                Dynamic Benchmark
+              </span>
+            </label>
+            <select
+              value={targetRoleInput}
+              onChange={(e) => setTargetRoleInput(e.target.value)}
+              className="w-full px-3 py-2.5 rounded-xl bg-white border border-black/20 text-xs font-bold text-black focus:outline-none focus:border-black font-display"
+            >
+              <option value="Software Development Engineer (SDE-1 — FAANG & Tier-1)">
+                Software Development Engineer (SDE-1 — FAANG & Tier-1 Product) [DSA: 40%, System Design: 25%]
+              </option>
+              <option value="Backend & Distributed Systems Engineer">
+                Backend & Distributed Systems Engineer [System Design: 30%, Backend/DB: 30%, DSA: 20%]
+              </option>
+              <option value="Frontend & Web Performance Engineer">
+                Frontend & Web Performance Engineer [Frontend Web Dev: 40%, Projects: 25%, DSA: 15%]
+              </option>
+              <option value="Full-Stack Software Engineer">
+                Full-Stack Software Engineer [Web Dev: 35%, Projects: 25%, DSA: 20%, System Design: 10%]
+              </option>
+              <option value="DevOps & Site Reliability Engineer (SRE)">
+                DevOps & Site Reliability Engineer (SRE) [DevOps & Cloud: 35%, System Design: 25%, Projects: 20%]
+              </option>
+              <option value="Data Engineer & ML Infrastructure">
+                Data Engineer & ML Infrastructure [Databases/Streaming: 35%, DSA: 25%, System Design: 20%]
+              </option>
+            </select>
+            <p className="text-[11px] text-black/60 leading-relaxed">
+              Selecting this role automatically calibrates the weightages of your Placement Readiness index and displays tailored recommendations on your dashboard.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Dream Target Companies */}
+            <div className="p-4 rounded-2xl bg-[#F9F9F7] border-2 border-black/15 space-y-1.5">
+              <label className="font-bold text-black">Dream Target Companies</label>
+              <input
+                type="text"
+                value={dreamCompaniesInput}
+                onChange={(e) => setDreamCompaniesInput(e.target.value)}
+                placeholder="e.g. Google, Atlassian, Uber, Microsoft, Stripe"
+                className="w-full px-3 py-2 rounded-xl bg-white border border-black/20 text-xs font-semibold text-black focus:outline-none focus:border-black"
+              />
+            </div>
+
+            {/* Work Mode */}
+            <div className="p-4 rounded-2xl bg-[#F9F9F7] border-2 border-black/15 space-y-1.5">
+              <label className="font-bold text-black">Preferred Work Arrangement</label>
+              <select
+                value={workModeInput}
+                onChange={(e) => setWorkModeInput(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl bg-white border border-black/20 text-xs font-semibold text-black focus:outline-none focus:border-black"
+              >
+                <option value="Hybrid / Remote / On-site">Hybrid / Remote / On-site (Flexible)</option>
+                <option value="Remote Only">Remote Only</option>
+                <option value="Hybrid">Hybrid</option>
+                <option value="On-site">On-site</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="pt-2 flex justify-end">
+            <button
+              type="submit"
+              className="px-5 py-2.5 rounded-2xl bg-black text-white font-mono font-bold text-xs hover:bg-neutral-800 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] flex items-center gap-2 cursor-pointer active:translate-y-0.5"
+            >
+              <Save className="w-4 h-4" />
+              <span>Save Academic Profile & Desired Role</span>
+            </button>
+          </div>
+        </form>
       </div>
 
       {/* Platform Cards Hub */}

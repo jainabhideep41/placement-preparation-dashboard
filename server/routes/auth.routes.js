@@ -4,6 +4,7 @@ import {
   getUserByEmail, 
   saveOrMergeUser, 
   completeUserOnboarding, 
+  updateUserProfile,
   updateUserPassword, 
   markEmailVerified, 
   markWelcomeEmailSent 
@@ -809,6 +810,40 @@ router.get('/user/:email', (req, res) => {
     return res.status(404).json({ success: false, message: 'User not found' });
   }
   res.json({ success: true, user });
+});
+
+/**
+ * POST /api/auth/profile
+ * Updates public username, academic credentials (CGPA, college, graduation year), handles, and target role
+ */
+router.post('/profile', (req, res) => {
+  const { email, username, name, targetRole, academic, handles, avatarUrl } = req.body;
+  if (!email) {
+    return res.status(400).json({ success: false, message: 'User email is required' });
+  }
+
+  try {
+    const updated = updateUserProfile(email, {
+      username,
+      name,
+      targetRole,
+      academic,
+      handles,
+      avatarUrl
+    });
+
+    if (!updated) {
+      return res.status(404).json({ success: false, message: 'User account not found' });
+    }
+
+    res.json({
+      success: true,
+      message: 'Candidate profile updated successfully',
+      user: updated
+    });
+  } catch (err) {
+    return res.status(400).json({ success: false, message: err.message });
+  }
 });
 
 export default router;

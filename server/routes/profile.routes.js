@@ -69,15 +69,27 @@ router.get('/:identifier', async (req, res) => {
       dsa: dsaPayload,
       webDev: defaultWebDevData,
       systemDesign: defaultSystemDesignData,
-      github: ghStats
+      github: ghStats,
+      targetRole: targetRole || req.query.role || 'Software Development Engineer (SDE-1)'
     });
 
     const publicProfile = {
       identifier,
+      username: matchedUser?.username || identifier,
       isRegistered,
       name: displayName,
       targetRole,
       avatarUrl,
+      academic: matchedUser?.academic || {
+        college: 'Chandigarh University',
+        degree: 'B.Tech Computer Science & Engineering',
+        branch: 'Computer Science',
+        year: '2026 (Final Year)',
+        cgpa: '8.85 / 10',
+        desiredOption: targetRole,
+        dreamCompanies: 'Google, Microsoft, Uber, Atlassian',
+        workMode: 'Hybrid / Remote / On-site'
+      },
       bio: ghStats?.profile?.bio || `Aspiring ${targetRole} with verified competency across Data Structures, Algorithms, Distributed Systems, and Full-Stack Engineering.`,
       location: ghStats?.profile?.location || 'India',
       handles: {
@@ -89,6 +101,8 @@ router.get('/:identifier', async (req, res) => {
         overallScore: readiness.overallScore,
         status: readiness.status,
         tierColor: readiness.tierColor,
+        calibratedRole: readiness.calibratedRole,
+        availableRoles: readiness.availableRoles,
         pillars: readiness.pillars,
         weakestArea: readiness.weakestArea,
         strongestArea: readiness.strongestArea,

@@ -17,7 +17,8 @@ import {
   X,
   Share2,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Trash2
 } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { MetricCard } from '../components/common/MetricCard';
@@ -58,7 +59,8 @@ export function DSA({ dsaHook }) {
     setFilterStatus,
     setSearchQuery,
     addProblem,
-    updateProblem
+    updateProblem,
+    deleteProblem
   } = dsaHook;
 
   const [searchParams, setSearchParams] = useSearchParams();
@@ -242,6 +244,23 @@ export function DSA({ dsaHook }) {
       }
     } else {
       updateProblem(problem.id, changes);
+    }
+  };
+
+  const handleDeleteMergedProblem = async (problem) => {
+    // If from curated sheet or has canonical key, remove from canonical solved map
+    if (problem.canonicalKey || problem.id?.startsWith('curated_') || ALL_UNIQUE_PROBLEMS.some(u => u.title?.toLowerCase() === problem.title?.toLowerCase())) {
+      setCanonicalSolvedMap(prev => {
+        const next = { ...prev };
+        const key = problem.canonicalKey || getCanonicalKey(problem);
+        delete next[key];
+        return next;
+      });
+    }
+
+    // If stored in problems list, remove from problemStore via API
+    if (problem.id && !problem.id.startsWith('curated_')) {
+      await deleteProblem(problem.id);
     }
   };
 
@@ -559,20 +578,29 @@ export function DSA({ dsaHook }) {
                       </td>
 
                       <td className="py-3.5 px-4">
-                        <button
-                          onClick={() =>
-                            handleUpdateMergedProblem(p, {
-                              revisionStatus: p.revisionStatus === 'Done' ? 'Due' : 'Done'
-                            })
-                          }
-                          className={`text-[11px] px-3 py-1 rounded-xl font-mono font-bold transition-all ${
-                            p.revisionStatus === 'Done'
-                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                              : 'bg-black/5 hover:bg-black/10 text-black border border-black/15'
-                          }`}
-                        >
-                          {p.revisionStatus === 'Done' ? 'Reviewed' : 'Mark Reviewed'}
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() =>
+                              handleUpdateMergedProblem(p, {
+                                revisionStatus: p.revisionStatus === 'Done' ? 'Due' : 'Done'
+                              })
+                            }
+                            className={`text-[11px] px-3 py-1 rounded-xl font-mono font-bold transition-all ${
+                              p.revisionStatus === 'Done'
+                                ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                : 'bg-black/5 hover:bg-black/10 text-black border border-black/15'
+                            }`}
+                          >
+                            {p.revisionStatus === 'Done' ? 'Reviewed' : 'Mark Reviewed'}
+                          </button>
+                          <button
+                            onClick={() => handleDeleteMergedProblem(p)}
+                            title="Delete task from review queue"
+                            className="p-1.5 rounded-xl text-black/40 hover:text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200 transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}

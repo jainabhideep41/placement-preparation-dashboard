@@ -89,6 +89,18 @@ export function useDSAData() {
     }
   };
 
+  const deleteProblem = async (id) => {
+    setProblems(prev => prev.filter(p => p.id !== id));
+
+    try {
+      await fetch(`/api/dsa/problems/${id}`, {
+        method: 'DELETE'
+      });
+    } catch (e) {
+      console.warn('Problem deletion synced locally only:', e);
+    }
+  };
+
   // Filtered problems list
   const filteredProblems = problems.filter(p => {
     if (filterTopic !== 'All' && p.topic !== filterTopic) return false;
@@ -127,6 +139,7 @@ export function useDSAData() {
     setSearchQuery,
     addProblem,
     updateProblem,
+    deleteProblem,
     refresh: fetchDSA
   };
 }
