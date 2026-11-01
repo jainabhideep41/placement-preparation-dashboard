@@ -12,7 +12,8 @@ import {
   LogOut,
   ExternalLink,
   Code2,
-  UserCheck
+  UserCheck,
+  Settings as SettingsIcon
 } from 'lucide-react';
 import { Badge } from '../common/Badge';
 import { ALL_UNIQUE_PROBLEMS, matchProblem } from '../../utils/curatedSheetsManager';
@@ -202,25 +203,40 @@ export function Navbar({
           <span>Public Profile</span>
         </Link>
 
+        {/* Settings Link */}
+        <Link
+          to="/settings"
+          title="Account Settings, Username & Dossier"
+          className="p-1.5 rounded-xl text-black/60 hover:text-black hover:bg-black/5 border border-transparent hover:border-black/10 transition-colors"
+        >
+          <SettingsIcon className="w-4 h-4" />
+        </Link>
+
         {/* User profile & logout */}
         <div className="flex items-center gap-2 pl-2 border-l border-black/10">
-          {currentUser?.avatarUrl ? (
-            <img
-              src={currentUser.avatarUrl}
-              alt={currentUser?.name || 'User'}
-              className="w-8 h-8 rounded-full border border-black/20 object-cover shadow-xs"
-            />
-          ) : (
-            <div className="w-8 h-8 rounded-full bg-black flex items-center justify-center font-mono text-xs font-bold text-white">
-              {currentUser?.name ? currentUser.name.substring(0, 2).toUpperCase() : 'ST'}
+          <Link
+            to="/settings"
+            title="Edit Profile in Settings"
+            className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+          >
+            {currentUser?.avatarUrl ? (
+              <img
+                src={currentUser.avatarUrl}
+                alt={currentUser?.name || 'User'}
+                className="w-8 h-8 rounded-full border border-black/20 object-cover shadow-xs"
+              />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-black flex items-center justify-center font-mono text-xs font-bold text-white">
+                {currentUser?.name ? currentUser.name.substring(0, 2).toUpperCase() : 'ST'}
+              </div>
+            )}
+            <div className="hidden md:block text-left text-xs leading-tight">
+              <span className="font-semibold text-black block truncate max-w-[100px]">
+                {currentUser?.name || 'Student'}
+              </span>
+              <span className="text-[10px] text-black/40 font-mono">Logged In</span>
             </div>
-          )}
-          <div className="hidden md:block text-left text-xs leading-tight">
-            <span className="font-semibold text-black block truncate max-w-[100px]">
-              {currentUser?.name || 'Student'}
-            </span>
-            <span className="text-[10px] text-black/40 font-mono">Logged In</span>
-          </div>
+          </Link>
           {onLogout && (
             <button
               onClick={onLogout}

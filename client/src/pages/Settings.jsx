@@ -338,7 +338,7 @@ export function Settings({ onRefreshAll }) {
 
           <div className="flex items-center gap-2 shrink-0">
             <a
-              href={`/u/${encodeURIComponent(currentUser?.handles?.leetcode || currentUser?.handles?.github || currentUser?.name || 'me')}`}
+              href={`/u/${encodeURIComponent(currentUser?.username || usernameInput || currentUser?.handles?.leetcode || currentUser?.handles?.github || currentUser?.name || 'me')}`}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white text-black text-xs font-mono font-bold hover:bg-neutral-100 transition-colors shadow-xs"
@@ -350,7 +350,7 @@ export function Settings({ onRefreshAll }) {
             <button
               type="button"
               onClick={() => {
-                const url = `${window.location.origin}/u/${encodeURIComponent(currentUser?.handles?.leetcode || currentUser?.handles?.github || currentUser?.name || 'me')}`;
+                const url = `${window.location.origin}/u/${encodeURIComponent(currentUser?.username || usernameInput || currentUser?.handles?.leetcode || currentUser?.handles?.github || currentUser?.name || 'me')}`;
                 if (navigator.clipboard) {
                   navigator.clipboard.writeText(url).then(() => {
                     setProfileCopied(true);

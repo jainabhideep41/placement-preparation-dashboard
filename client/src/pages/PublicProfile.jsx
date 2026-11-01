@@ -27,7 +27,9 @@ import {
   Sparkles,
   UserCheck,
   GraduationCap,
-  Building2
+  Building2,
+  Settings as SettingsIcon,
+  Edit3
 } from 'lucide-react';
 import { findUserByIdentifier } from '../utils/accountManager';
 
@@ -40,6 +42,7 @@ export function PublicProfile({ currentUser }) {
   const queryParam = searchParams.get('user') || searchParams.get('u') || searchParams.get('handle') || searchParams.get('id');
   const resolvedIdentifier = username || 
     queryParam ||
+    currentUser?.username ||
     currentUser?.handles?.leetcode || 
     currentUser?.handles?.github || 
     currentUser?.name || 
@@ -260,13 +263,23 @@ export function PublicProfile({ currentUser }) {
             </button>
 
             {currentUser ? (
-              <Link
-                to="/dashboard"
-                className="flex items-center gap-1.5 px-3.5 py-1.5 bg-black text-white rounded font-mono text-xs font-bold hover:bg-black/85 transition-colors shadow-[2px_2px_0px_0px_#444]"
-              >
-                <span>Open Dashboard</span>
-                <ChevronRight className="w-3.5 h-3.5" />
-              </Link>
+              <>
+                <Link
+                  to="/settings"
+                  className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-white border-2 border-black rounded font-mono text-xs font-bold shadow-[2px_2px_0px_0px_#000] hover:bg-black hover:text-white transition-all active:translate-x-0.5 active:translate-y-0.5"
+                >
+                  <SettingsIcon className="w-3.5 h-3.5" />
+                  <span>Edit Profile</span>
+                </Link>
+
+                <Link
+                  to="/dashboard"
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 bg-black text-white rounded font-mono text-xs font-bold hover:bg-black/85 transition-colors shadow-[2px_2px_0px_0px_#444]"
+                >
+                  <span>Dashboard</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </Link>
+              </>
             ) : (
               <Link
                 to="/login"
@@ -442,6 +455,16 @@ export function PublicProfile({ currentUser }) {
                 <span className="font-mono text-xs font-bold px-2 py-0.5 bg-neutral-100 border border-black rounded">
                   {profile.academic.year || '2026 Batch'}
                 </span>
+                {currentUser && (
+                  <Link
+                    to="/settings"
+                    className="font-mono text-xs font-bold px-2.5 py-1 bg-black text-white hover:bg-neutral-800 rounded border border-black inline-flex items-center gap-1.5 transition-colors shadow-xs"
+                    title="Edit Academic Details and Career Track in Settings"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    <span>Edit Details</span>
+                  </Link>
+                )}
               </div>
             </div>
 
