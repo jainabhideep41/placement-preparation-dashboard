@@ -58,9 +58,9 @@ export function saveUserToRegistry(user) {
     password: user.password || existing?.password || null,
     emailVerified: user.emailVerified ?? existing?.emailVerified ?? (user.provider === 'google' || user.provider === 'github'),
     handles: {
-      leetcode: user.handles?.leetcode || existing?.handles?.leetcode || '',
-      codeforces: user.handles?.codeforces || existing?.handles?.codeforces || '',
-      github: user.handles?.github || existing?.handles?.github || ''
+      leetcode: user.handles?.leetcode !== undefined ? user.handles.leetcode : (existing?.handles?.leetcode || ''),
+      codeforces: user.handles?.codeforces !== undefined ? user.handles.codeforces : (existing?.handles?.codeforces || ''),
+      github: user.handles?.github !== undefined ? user.handles.github : (existing?.handles?.github || '')
     },
     onboardingCompleted: user.onboardingCompleted ?? existing?.onboardingCompleted ?? false,
     registeredAt: existing?.registeredAt || new Date().toISOString(),
@@ -70,6 +70,13 @@ export function saveUserToRegistry(user) {
   users[emailKey] = merged;
   try {
     window.localStorage.setItem('prep_registered_users', JSON.stringify(users));
+    const active = window.localStorage.getItem('prep_auth_user');
+    if (active) {
+      const activeObj = JSON.parse(active);
+      if (activeObj?.email?.toLowerCase() === emailKey) {
+        window.localStorage.setItem('prep_auth_user', JSON.stringify(merged));
+      }
+    }
   } catch (e) {
     console.warn('Could not persist users registry:', e);
   }

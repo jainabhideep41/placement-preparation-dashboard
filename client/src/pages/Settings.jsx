@@ -142,11 +142,18 @@ export function Settings({ onRefreshAll }) {
 
     // 1. Save locally in registry & prep_auth_user
     if (currentUser?.email) {
+      const currentHandles = {
+        codeforces: cfInput.trim() || handles.codeforces || currentUser.handles?.codeforces || '',
+        leetcode: lcInput.trim() || handles.leetcode || currentUser.handles?.leetcode || '',
+        github: ghInput.trim() || handles.github || currentUser.handles?.github || ''
+      };
+
       saveUserToRegistry({
         ...currentUser,
         username: cleanUsername,
         name: nameInput.trim() || currentUser.name,
         targetRole: targetRoleInput,
+        handles: currentHandles,
         academic: updatedAcademic
       });
 
@@ -160,6 +167,7 @@ export function Settings({ onRefreshAll }) {
             username: cleanUsername,
             name: nameInput.trim() || currentUser.name,
             targetRole: targetRoleInput,
+            handles: currentHandles,
             academic: updatedAcademic
           })
         });
@@ -188,20 +196,39 @@ export function Settings({ onRefreshAll }) {
     setHandles(newHandles);
 
     if (currentUser?.email) {
-      saveUserToRegistry({
+      const updatedUser = {
         ...currentUser,
         handles: newHandles
-      });
+      };
+      saveUserToRegistry(updatedUser);
 
-      fetch('/api/auth/complete-onboarding', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: currentUser.email,
-          handles: newHandles,
-          targetRole: currentUser.targetRole
-        })
-      }).catch(() => {});
+      try {
+        await Promise.all([
+          fetch('/api/auth/complete-onboarding', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: currentUser.email,
+              handles: newHandles,
+              targetRole: currentUser.targetRole
+            })
+          }),
+          fetch('/api/auth/profile', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: currentUser.email,
+              username: currentUser.username || usernameInput,
+              name: currentUser.name || nameInput,
+              targetRole: currentUser.targetRole || targetRoleInput,
+              handles: newHandles,
+              academic: currentUser.academic
+            })
+          })
+        ]);
+      } catch (err) {
+        console.warn('Backend handle sync warning:', err);
+      }
     }
 
     setSavedSuccess(true);
@@ -218,20 +245,37 @@ export function Settings({ onRefreshAll }) {
     setHandles(presetHandles);
 
     if (currentUser?.email) {
-      saveUserToRegistry({
+      const updatedUser = {
         ...currentUser,
         handles: presetHandles
-      });
+      };
+      saveUserToRegistry(updatedUser);
 
-      fetch('/api/auth/complete-onboarding', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: currentUser.email,
-          handles: presetHandles,
-          targetRole: currentUser.targetRole
-        })
-      }).catch(() => {});
+      try {
+        await Promise.all([
+          fetch('/api/auth/complete-onboarding', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: currentUser.email,
+              handles: presetHandles,
+              targetRole: currentUser.targetRole
+            })
+          }),
+          fetch('/api/auth/profile', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: currentUser.email,
+              username: currentUser.username || usernameInput,
+              name: currentUser.name || nameInput,
+              targetRole: currentUser.targetRole || targetRoleInput,
+              handles: presetHandles,
+              academic: currentUser.academic
+            })
+          })
+        ]);
+      } catch (err) {}
     }
 
     setSavedSuccess(true);

@@ -17,20 +17,22 @@ router.get('/:identifier', async (req, res) => {
 
     const matchedUser = findUserByIdentifier(identifier);
 
-    // Determine coding handles
-    let lcUser = matchedUser?.handles?.leetcode || '';
-    let cfUser = matchedUser?.handles?.codeforces || '';
-    let ghUser = matchedUser?.handles?.github || '';
-    let displayName = matchedUser?.name || '';
+    // Determine coding handles from registered user or query overrides
+    let lcUser = matchedUser?.handles?.leetcode || req.query.lc || '';
+    let cfUser = matchedUser?.handles?.codeforces || req.query.cf || '';
+    let ghUser = matchedUser?.handles?.github || req.query.gh || '';
+    let displayName = matchedUser?.name || req.query.name || '';
     let targetRole = matchedUser?.targetRole || 'Software Development Engineer (SDE-1)';
     let avatarUrl = matchedUser?.avatarUrl || '';
     let isRegistered = Boolean(matchedUser);
 
-    // If identifier is not registered yet, treat it as a coding handle directly (like LeetCode/Codeforces profile viewer)
-    if (!matchedUser) {
-      lcUser = req.query.lc || identifier;
-      cfUser = req.query.cf || identifier;
-      ghUser = req.query.gh || identifier;
+    // If identifier is not registered and no specific handles were passed, treat identifier as CP handle
+    if (!matchedUser && !lcUser && !cfUser && !ghUser) {
+      lcUser = identifier;
+      cfUser = identifier;
+      ghUser = identifier;
+      displayName = identifier;
+    } else if (!displayName) {
       displayName = identifier;
     }
 
@@ -93,9 +95,9 @@ router.get('/:identifier', async (req, res) => {
       bio: ghStats?.profile?.bio || `Aspiring ${targetRole} with verified competency across Data Structures, Algorithms, Distributed Systems, and Full-Stack Engineering.`,
       location: ghStats?.profile?.location || 'India',
       handles: {
-        leetcode: lcStats.connected ? lcStats.username : lcUser,
-        codeforces: cfStats.connected ? cfStats.username : cfUser,
-        github: ghStats.profile?.username ? ghStats.profile.username : ghUser
+        leetcode: lcUser || (lcStats.connected ? lcStats.username : ''),
+        codeforces: cfUser || (cfStats.connected ? cfStats.username : ''),
+        github: ghUser || (ghStats.profile?.username ? ghStats.profile.username : '')
       },
       readiness: {
         overallScore: readiness.overallScore,

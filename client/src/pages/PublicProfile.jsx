@@ -66,14 +66,45 @@ export function PublicProfile({ currentUser }) {
     setError(null);
 
     async function fetchProfileData() {
+      // 1. Locate local candidate data if available (from registry or current logged-in user)
+      const localUser = findUserByIdentifier(resolvedIdentifier) || 
+        (currentUser && (
+          currentUser.username?.toLowerCase() === resolvedIdentifier.toLowerCase() ||
+          currentUser.email?.split('@')[0]?.toLowerCase() === resolvedIdentifier.toLowerCase() ||
+          currentUser.handles?.leetcode?.toLowerCase() === resolvedIdentifier.toLowerCase() ||
+          currentUser.handles?.github?.toLowerCase() === resolvedIdentifier.toLowerCase()
+        ) ? currentUser : null);
+
+      const localHandles = localUser?.handles || (currentUser?.username?.toLowerCase() === resolvedIdentifier.toLowerCase() ? currentUser?.handles : null);
+
+      // Build API query with exact user handles if known locally
+      const queryParams = new URLSearchParams();
+      if (localHandles?.leetcode) queryParams.set('lc', localHandles.leetcode);
+      if (localHandles?.codeforces) queryParams.set('cf', localHandles.codeforces);
+      if (localHandles?.github) queryParams.set('gh', localHandles.github);
+      if (localUser?.name) queryParams.set('name', localUser.name);
+
+      const apiUrl = `/api/public/profile/${encodeURIComponent(resolvedIdentifier)}${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+
       try {
-        const res = await fetch(`/api/public/profile/${encodeURIComponent(resolvedIdentifier)}`);
+        const res = await fetch(apiUrl);
         if (!res.ok) {
           throw new Error(`Profile fetch failed: ${res.status}`);
         }
         const data = await res.json();
         if (data.success && data.profile && isMounted) {
-          setProfile(data.profile);
+          const mergedProfile = {
+            ...data.profile,
+            name: localUser?.name || data.profile.name,
+            targetRole: localUser?.targetRole || data.profile.targetRole,
+            academic: localUser?.academic ? { ...data.profile.academic, ...localUser.academic } : data.profile.academic,
+            handles: {
+              leetcode: localHandles?.leetcode || data.profile.handles?.leetcode || '',
+              codeforces: localHandles?.codeforces || data.profile.handles?.codeforces || '',
+              github: localHandles?.github || data.profile.handles?.github || ''
+            }
+          };
+          setProfile(mergedProfile);
           setLoading(false);
           return;
         }
@@ -83,19 +114,18 @@ export function PublicProfile({ currentUser }) {
 
       // Client-side fallback if backend unavailable or offline
       if (isMounted) {
-        const localUser = findUserByIdentifier(resolvedIdentifier);
         const fallbackProfile = {
           identifier: resolvedIdentifier,
           isRegistered: Boolean(localUser),
           name: localUser?.name || resolvedIdentifier,
           targetRole: localUser?.targetRole || 'Software Development Engineer (SDE-1)',
-          avatarUrl: localUser?.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(resolvedIdentifier)}&background=111&color=fff`,
+          avatarUrl: localUser?.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(localUser?.name || resolvedIdentifier)}&background=111&color=fff`,
           bio: 'Aspiring Software Engineer with verified competence across Data Structures, Algorithms, Distributed Systems, and Full-Stack Engineering.',
           location: 'India',
           handles: {
-            leetcode: localUser?.handles?.leetcode || resolvedIdentifier,
-            codeforces: localUser?.handles?.codeforces || resolvedIdentifier,
-            github: localUser?.handles?.github || resolvedIdentifier
+            leetcode: localHandles?.leetcode || '',
+            codeforces: localHandles?.codeforces || '',
+            github: localHandles?.github || ''
           },
           readiness: {
             overallScore: 84,
@@ -115,8 +145,8 @@ export function PublicProfile({ currentUser }) {
           dsa: {
             totalSolves: 342,
             leetcode: {
-              connected: true,
-              username: localUser?.handles?.leetcode || resolvedIdentifier,
+              connected: Boolean(localHandles?.leetcode),
+              username: localHandles?.leetcode || 'unlinked',
               problemsSolved: 285,
               easy: 110,
               medium: 145,
@@ -127,8 +157,8 @@ export function PublicProfile({ currentUser }) {
               acceptanceRate: '64.2%'
             },
             codeforces: {
-              connected: true,
-              username: localUser?.handles?.codeforces || resolvedIdentifier,
+              connected: Boolean(localHandles?.codeforces),
+              username: localHandles?.codeforces || 'unlinked',
               problemsSolved: 57,
               rating: 1380,
               maxRating: 1420,
@@ -143,13 +173,13 @@ export function PublicProfile({ currentUser }) {
             ]
           },
           github: {
-            username: localUser?.handles?.github || resolvedIdentifier,
+            username: localHandles?.github || 'unlinked',
             publicRepos: 18,
             followers: 42,
             totalCommitsLastYear: 384,
             pullRequests: 24,
-            mergedPullRequests: 21,
-            totalStars: 95
+            mergedPullRequests: 19,
+            totalStars: 48
           },
           projects: [
             {

@@ -210,9 +210,9 @@ export function updateUserProfile(email, profileData = {}) {
   if (profileData.avatarUrl) user.avatarUrl = profileData.avatarUrl.trim();
   if (profileData.handles) {
     user.handles = {
-      leetcode: profileData.handles.leetcode?.trim() ?? user.handles.leetcode,
-      codeforces: profileData.handles.codeforces?.trim() ?? user.handles.codeforces,
-      github: profileData.handles.github?.trim() ?? user.handles.github
+      leetcode: profileData.handles.leetcode !== undefined ? profileData.handles.leetcode.trim() : (user.handles?.leetcode || ''),
+      codeforces: profileData.handles.codeforces !== undefined ? profileData.handles.codeforces.trim() : (user.handles?.codeforces || ''),
+      github: profileData.handles.github !== undefined ? profileData.handles.github.trim() : (user.handles?.github || '')
     };
   }
   if (profileData.academic) {
@@ -280,19 +280,28 @@ export function markEmailVerified(email) {
 export function completeUserOnboarding(email, handles = {}, targetRole) {
   const key = normalizeEmail(email);
   loadUsersFromDisk();
-  const user = usersByEmail.get(key);
-  if (!user) return null;
-
-  user.handles = {
-    leetcode: handles.leetcode?.trim() ?? user.handles.leetcode,
-    codeforces: handles.codeforces?.trim() ?? user.handles.codeforces,
-    github: handles.github?.trim() ?? user.handles.github
-  };
-  if (targetRole) user.targetRole = targetRole;
-  user.onboardingCompleted = true;
-  user.lastLoginAt = new Date().toISOString();
-
-  usersByEmail.set(key, user);
-  persistUsersToDisk();
+  let user = usersByEmail.get(key);
+  if (!user) {
+    user = saveOrMergeUser({
+      email: key,
+      handles: {
+        leetcode: handles.leetcode?.trim() || '',
+        codeforces: handles.codeforces?.trim() || '',
+        github: handles.github?.trim() || ''
+      },
+      targetRole: targetRole || 'Software Development Engineer (SDE-1)'
+    });
+  } else {
+    user.handles = {
+      leetcode: handles.leetcode !== undefined ? handles.leetcode.trim() : (user.handles?.leetcode || ''),
+      codeforces: handles.codeforces !== undefined ? handles.codeforces.trim() : (user.handles?.codeforces || ''),
+      github: handles.github !== undefined ? handles.github.trim() : (user.handles?.github || '')
+    };
+    if (targetRole) user.targetRole = targetRole;
+    user.onboardingCompleted = true;
+    user.lastLoginAt = new Date().toISOString();
+    usersByEmail.set(key, user);
+    persistUsersToDisk();
+  }
   return user;
 }
