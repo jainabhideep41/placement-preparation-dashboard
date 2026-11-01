@@ -16,7 +16,10 @@ import {
   AlertCircle,
   Sparkles,
   RefreshCw,
-  ExternalLink
+  ExternalLink,
+  Share2,
+  Copy,
+  UserCheck
 } from 'lucide-react';
 import { useLocalCache } from '../hooks/useLocalCache';
 import { Badge } from '../components/common/Badge';
@@ -36,6 +39,7 @@ export function Settings({ onRefreshAll }) {
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [cacheMessage, setCacheMessage] = useState('');
   const [syncing, setSyncing] = useState(false);
+  const [profileCopied, setProfileCopied] = useState(false);
 
   // Resend email state for settings
   const [resendCooldown, setResendCooldown] = useState(0);
@@ -234,6 +238,64 @@ export function Settings({ onRefreshAll }) {
           </div>
         </div>
       )}
+
+      {/* Public Developer Profile Link Card */}
+      <div className="p-5 sm:p-6 rounded-3xl bg-neutral-900 text-white border-2 border-black space-y-4 shadow-[4px_4px_0px_rgba(0,0,0,1)]">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <UserCheck className="w-5 h-5 text-emerald-400" />
+              <h2 className="text-base font-extrabold font-display">
+                Public Developer Profile & Recruiter Dossier
+              </h2>
+              <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 font-bold">
+                Public Link
+              </span>
+            </div>
+            <p className="text-xs text-neutral-300">
+              Share your verified placement readiness index, LeetCode/Codeforces stats, and production project portfolio with recruiters. No login required for viewers!
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <a
+              href={`/u/${encodeURIComponent(currentUser?.handles?.leetcode || currentUser?.handles?.github || currentUser?.name || 'me')}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white text-black text-xs font-mono font-bold hover:bg-neutral-100 transition-colors shadow-xs"
+            >
+              <span>View Profile</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+
+            <button
+              type="button"
+              onClick={() => {
+                const url = `${window.location.origin}/u/${encodeURIComponent(currentUser?.handles?.leetcode || currentUser?.handles?.github || currentUser?.name || 'me')}`;
+                if (navigator.clipboard) {
+                  navigator.clipboard.writeText(url).then(() => {
+                    setProfileCopied(true);
+                    setTimeout(() => setProfileCopied(false), 2500);
+                  });
+                }
+              }}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-neutral-800 border border-neutral-700 text-white text-xs font-mono font-bold hover:bg-neutral-700 transition-colors shadow-xs"
+            >
+              {profileCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+              <span>{profileCopied ? 'Copied!' : 'Copy Link'}</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="p-3 bg-neutral-950 rounded-xl border border-neutral-800 flex items-center justify-between font-mono text-xs text-neutral-400 overflow-x-auto">
+          <span className="truncate mr-3">
+            {typeof window !== 'undefined' ? `${window.location.origin}/u/${encodeURIComponent(currentUser?.handles?.leetcode || currentUser?.handles?.github || currentUser?.name || 'me')}` : `/u/${currentUser?.handles?.leetcode || 'me'}`}
+          </span>
+          <span className="text-[10px] text-emerald-400 uppercase font-bold shrink-0">
+            Recruiter Ready
+          </span>
+        </div>
+      </div>
 
       {/* Platform Cards Hub */}
       <div className="p-6 sm:p-7 rounded-3xl bg-white border-2 border-black space-y-6 shadow-[4px_4px_0px_rgba(0,0,0,1)]">

@@ -21,7 +21,9 @@ function spaRoutesPlugin() {
     'readiness',
     'placement-readiness',
     'settings',
-    'login'
+    'login',
+    'u',
+    'profile'
   ];
 
   return {

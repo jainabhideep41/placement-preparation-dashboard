@@ -11,7 +11,8 @@ import {
   Sparkles,
   LogOut,
   ExternalLink,
-  Code2
+  Code2,
+  UserCheck
 } from 'lucide-react';
 import { Badge } from '../common/Badge';
 import { ALL_UNIQUE_PROBLEMS, matchProblem } from '../../utils/curatedSheetsManager';
@@ -190,6 +191,16 @@ export function Navbar({
             <span className="font-bold">{readinessScore}%</span>
           </Badge>
         </div>
+
+        {/* Public Profile View Link */}
+        <Link
+          to="/u"
+          title="View Your Public Developer Profile"
+          className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-mono font-bold bg-white border border-black/20 hover:border-black text-black shadow-xs transition-all hover:bg-neutral-50 active:translate-y-0.5"
+        >
+          <UserCheck className="w-3.5 h-3.5 text-emerald-600" />
+          <span>Public Profile</span>
+        </Link>
 
         {/* User profile & logout */}
         <div className="flex items-center gap-2 pl-2 border-l border-black/10">

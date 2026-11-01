@@ -82,3 +82,23 @@ export function updateUserPasswordInRegistry(email, newPassword) {
   }
   return null;
 }
+
+export function findUserByIdentifier(identifier) {
+  if (!identifier) return null;
+  const rawId = identifier.trim().toLowerCase();
+  const users = getRegisteredUsers();
+
+  // 1. Direct email match
+  if (users[rawId]) return users[rawId];
+
+  // 2. Loop values
+  for (const user of Object.values(users)) {
+    if (user.id?.toLowerCase() === rawId) return user;
+    if (user.email?.split('@')[0]?.toLowerCase() === rawId) return user;
+    if (user.name?.trim().toLowerCase() === rawId) return user;
+    if (user.handles?.leetcode?.trim().toLowerCase() === rawId) return user;
+    if (user.handles?.github?.trim().toLowerCase() === rawId) return user;
+    if (user.handles?.codeforces?.trim().toLowerCase() === rawId) return user;
+  }
+  return null;
+}

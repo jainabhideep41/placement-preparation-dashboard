@@ -11,6 +11,7 @@ import systemDesignRoutes from './routes/systemdesign.routes.js';
 import githubRoutes from './routes/github.routes.js';
 import readinessRoutes from './routes/readiness.routes.js';
 import authRoutes from './routes/auth.routes.js';
+import profileRoutes from './routes/profile.routes.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -53,6 +54,8 @@ app.use('/api/systemdesign', systemDesignRoutes);
 app.use('/api/github', githubRoutes);
 app.use('/api/readiness', readinessRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/profile', profileRoutes);
+app.use('/api/public/profile', profileRoutes);
 
 // 404 handler for API routes
 app.use('/api/*', (req, res) => {

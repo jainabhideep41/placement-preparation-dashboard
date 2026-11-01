@@ -10,6 +10,7 @@ import { GitHubFOSS } from './pages/GitHubFOSS';
 import { PlacementReadiness } from './pages/PlacementReadiness';
 import { Settings } from './pages/Settings';
 import { Login } from './pages/Login';
+import { PublicProfile } from './pages/PublicProfile';
 import { OnboardingModal } from './components/common/OnboardingModal';
 import { findUserByEmail, saveUserToRegistry } from './utils/accountManager';
 
@@ -173,12 +174,31 @@ export function App() {
     return <OnboardingModal user={onboardingUser} onComplete={handleCompleteOnboarding} />;
   }
 
-  // If student is not logged in, render the Login / Registration page!
+  // Check if viewing a standalone public profile route
+  const isProfileRoute = location.pathname.startsWith('/u') || location.pathname.startsWith('/profile');
+
+  // If student is not logged in, permit public profile viewing or show Login
   if (!currentUser) {
     return (
       <Routes>
+        <Route path="/u/:username" element={<PublicProfile currentUser={null} />} />
+        <Route path="/profile/:username" element={<PublicProfile currentUser={null} />} />
+        <Route path="/u" element={<PublicProfile currentUser={null} />} />
+        <Route path="/profile" element={<PublicProfile currentUser={null} />} />
         <Route path="/login" element={<Login onLogin={handleLogin} />} />
         <Route path="*" element={<Login onLogin={handleLogin} />} />
+      </Routes>
+    );
+  }
+
+  // Standalone public profile view for logged-in user or external visitor
+  if (isProfileRoute) {
+    return (
+      <Routes>
+        <Route path="/u/:username" element={<PublicProfile currentUser={currentUser} />} />
+        <Route path="/profile/:username" element={<PublicProfile currentUser={currentUser} />} />
+        <Route path="/u" element={<PublicProfile currentUser={currentUser} />} />
+        <Route path="/profile" element={<PublicProfile currentUser={currentUser} />} />
       </Routes>
     );
   }

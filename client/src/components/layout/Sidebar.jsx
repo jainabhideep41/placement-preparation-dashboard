@@ -10,7 +10,8 @@ import {
   Settings,
   Flame,
   CheckCircle,
-  ExternalLink
+  ExternalLink,
+  UserCheck
 } from 'lucide-react';
 
 export function Sidebar({ 
@@ -72,6 +73,14 @@ export function Sidebar({
       label: 'Placement Readiness',
       icon: Award,
       badge: 'Engine'
+    },
+    {
+      id: 'profile',
+      path: '/u',
+      aliases: ['/u', '/profile'],
+      label: 'Public Profile',
+      icon: UserCheck,
+      badge: 'Share'
     },
     {
       id: 'settings',

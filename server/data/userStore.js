@@ -63,6 +63,31 @@ export function getUserByEmail(email) {
 }
 
 /**
+ * Find user by any identifier: email, id, name, or connected coding handles
+ */
+export function findUserByIdentifier(identifier) {
+  if (!identifier) return null;
+  loadUsersFromDisk();
+  const rawId = identifier.trim().toLowerCase();
+
+  // 1. Direct email lookup
+  if (usersByEmail.has(rawId)) {
+    return usersByEmail.get(rawId);
+  }
+
+  // 2. Loop through users
+  for (const user of usersByEmail.values()) {
+    if (user.id?.toLowerCase() === rawId) return user;
+    if (user.email?.split('@')[0]?.toLowerCase() === rawId) return user;
+    if (user.name?.trim().toLowerCase() === rawId) return user;
+    if (user.handles?.leetcode?.trim().toLowerCase() === rawId) return user;
+    if (user.handles?.github?.trim().toLowerCase() === rawId) return user;
+    if (user.handles?.codeforces?.trim().toLowerCase() === rawId) return user;
+  }
+  return null;
+}
+
+/**
  * Save or merge user account by email
  * Guarantees unified single-account per email across all auth providers
  */
