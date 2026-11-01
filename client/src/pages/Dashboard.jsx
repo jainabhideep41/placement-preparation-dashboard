@@ -25,6 +25,7 @@ import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
 import { RatingGraph } from '../components/dashboard/RatingGraph';
 import { HandleConfigModal } from '../components/dashboard/HandleConfigModal';
 import { useLocalCache } from '../hooks/useLocalCache';
+import { saveUserToRegistry } from '../utils/accountManager';
 
 export function Dashboard({ dashboardData, loading, onNavigate, onRefreshAll }) {
   const [handles, setHandles] = useLocalCache('prep_user_handles', {
@@ -39,7 +40,28 @@ export function Dashboard({ dashboardData, loading, onNavigate, onRefreshAll }) 
 
   const applyHandles = async (newCf, newLc, newGh) => {
     setSyncing(true);
-    setHandles({ codeforces: newCf, leetcode: newLc, github: newGh });
+    const newHandles = { codeforces: newCf, leetcode: newLc, github: newGh };
+    setHandles(newHandles);
+
+    if (authProfile?.email) {
+      saveUserToRegistry({
+        ...authProfile,
+        handles: newHandles
+      }, true);
+      try {
+        fetch('/api/auth/profile', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: authProfile.email,
+            handles: newHandles
+          })
+        }).catch(() => {});
+      } catch (e) {
+        // offline fallback
+      }
+    }
+
     if (onRefreshAll) await onRefreshAll();
     setSyncing(false);
   };

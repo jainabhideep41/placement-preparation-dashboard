@@ -261,7 +261,7 @@ export function JakeResumeModal({ isOpen, onClose, profile }) {
 
                       return items.map((item, idx) => (
                         <React.Fragment key={idx}>
-                          {idx > 0 && <span className="text-black/50 font-sans text-[10px]">$|$</span>}
+                          {idx > 0 && <span className="text-black/50 font-sans text-[10px] mx-0.5">|</span>}
                           {item}
                         </React.Fragment>
                       ));
@@ -326,13 +326,13 @@ export function JakeResumeModal({ isOpen, onClose, profile }) {
                         <div className="flex justify-between items-baseline flex-wrap gap-1">
                           <div>
                             <strong className="text-black">{proj.title}</strong>
-                            <span className="italic text-black/80"> $|$ {proj.techStack}</span>
+                            <span className="italic text-black/80"> | {proj.techStack}</span>
                           </div>
                           <div className="text-[11px] italic text-black/80 shrink-0">
                             <span>{proj.date}</span>
                             {proj.githubUrl && (
                               <>
-                                <span> $|$ </span>
+                                <span> | </span>
                                 <a href={proj.githubUrl} target="_blank" rel="noopener noreferrer" className="underline text-black">
                                   GitHub
                                 </a>

@@ -243,7 +243,7 @@ export function Settings({ onRefreshAll }) {
         ...currentUser,
         handles: newHandles
       };
-      saveUserToRegistry(updatedUser);
+      saveUserToRegistry(updatedUser, true);
 
       try {
         await Promise.all([
@@ -292,7 +292,7 @@ export function Settings({ onRefreshAll }) {
         ...currentUser,
         handles: presetHandles
       };
-      saveUserToRegistry(updatedUser);
+      saveUserToRegistry(updatedUser, true);
 
       try {
         await Promise.all([

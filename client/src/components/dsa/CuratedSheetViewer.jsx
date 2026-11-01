@@ -34,7 +34,7 @@ import {
 import { useLocalCache } from '../../hooks/useLocalCache';
 import { ProgressBar } from '../common/ProgressBar';
 
-export const SHEET_REGISTRY = {
+const SHEET_REGISTRY = {
   all_unique: {
     id: 'all_unique',
     title: "All Curated Problems (Master Question Bank)",
@@ -168,7 +168,7 @@ export function CuratedSheetViewer({ sheetId = 'striver_sde', onBack, onAddProbl
         return next;
       });
       if (onDeleteProblem) {
-        await onDeleteProblem(problem.id || canonKey);
+        await onDeleteProblem(problem.id || canonKey || problem.title);
       }
     } else {
       if (onAddProblem) {

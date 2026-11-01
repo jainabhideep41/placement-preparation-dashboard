@@ -10,13 +10,18 @@ router.get('/', (req, res) => {
   const completedTopics = sysDesignState.topics.filter(t => t.completed).length;
   const percentage = totalTopics > 0 ? Math.round((completedTopics / totalTopics) * 100) : 0;
 
-  res.json({
-    success: true,
+  const payload = {
     percentage,
     completedTopics,
     totalTopics,
     topics: sysDesignState.topics,
     caseStudies: sysDesignState.caseStudies
+  };
+
+  res.json({
+    success: true,
+    ...payload,
+    data: payload
   });
 });
 

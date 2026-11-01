@@ -17,6 +17,7 @@ import {
 import { MetricCard } from '../components/common/MetricCard';
 import { Badge } from '../components/common/Badge';
 import { useLocalCache } from '../hooks/useLocalCache';
+import { saveUserToRegistry } from '../utils/accountManager';
 import { GitHubContributionHeatmap } from '../components/github/GitHubContributionHeatmap';
 
 export function GitHubFOSS() {
@@ -103,10 +104,28 @@ export function GitHubFOSS() {
           />
           <button
             onClick={() => {
-              setHandles({ ...handles, github: customGhUser.trim() });
-              loadGitHub(customGhUser.trim());
+              const cleanGh = customGhUser.trim();
+              setHandles({ ...handles, github: cleanGh });
+              if (currentUser?.email) {
+                saveUserToRegistry({
+                  ...currentUser,
+                  handles: {
+                    ...(currentUser.handles || {}),
+                    github: cleanGh
+                  }
+                }, true);
+                fetch('/api/auth/profile', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    email: currentUser.email,
+                    handles: { ...(currentUser.handles || {}), github: cleanGh }
+                  })
+                }).catch(() => {});
+              }
+              loadGitHub(cleanGh);
             }}
-            className="px-4 py-2 rounded-xl bg-black hover:bg-neutral-800 text-xs font-bold text-white font-mono shadow-[2px_2px_0px_rgba(0,0,0,1)] transition-all"
+            className="px-4 py-2 rounded-xl bg-black hover:bg-neutral-800 text-xs font-bold text-white font-mono shadow-[2px_2px_0px_rgba(0,0,0,1)] transition-all cursor-pointer"
           >
             Fetch Live
           </button>

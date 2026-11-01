@@ -18,8 +18,6 @@ import {
   Cpu,
   Flame,
   TrendingUp,
-  MapPin,
-  Calendar,
   Briefcase,
   ArrowUpRight,
   Globe,
@@ -33,8 +31,7 @@ import {
   FileText,
   Mail,
   Phone,
-  EyeOff,
-  Lock
+  EyeOff
 } from 'lucide-react';
 import { findUserByIdentifier } from '../utils/accountManager';
 import { JakeResumeModal } from '../components/profile/JakeResumeModal';
@@ -72,7 +69,6 @@ export function PublicProfile({ currentUser }) {
 
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [copied, setCopied] = useState(false);
   const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'dsa' | 'projects' | 'system-design'
   const [showResumeModal, setShowResumeModal] = useState(searchParams.get('resume') === 'true');
@@ -80,7 +76,6 @@ export function PublicProfile({ currentUser }) {
   useEffect(() => {
     let isMounted = true;
     setLoading(true);
-    setError(null);
 
     async function fetchProfileData() {
       // 1. Locate local candidate data if available (from registry or current logged-in user)
@@ -263,7 +258,7 @@ export function PublicProfile({ currentUser }) {
     };
   }, [resolvedIdentifier]);
 
-  const canonicalUsername = (profile?.identifier || username || resolvedIdentifier || 'demo').replace(/[^a-z0-9_-]/gi, '').toLowerCase();
+  const canonicalUsername = (profile?.username || profile?.identifier || username || resolvedIdentifier || 'demo').replace(/[^a-z0-9_-]/gi, '').toLowerCase();
   const canonicalShareUrl = typeof window !== 'undefined'
     ? `${window.location.origin}/u/${encodeURIComponent(canonicalUsername)}`
     : `/u/${canonicalUsername}`;

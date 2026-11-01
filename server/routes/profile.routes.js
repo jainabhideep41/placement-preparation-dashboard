@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { findUserByIdentifier } from '../data/userStore.js';
+import { findUserByIdentifier, getUserByEmail } from '../data/userStore.js';
 import { getLeetCodeStats } from '../services/dsa/leetcode.adapter.js';
 import { getCodeforcesStats } from '../services/dsa/codeforces.adapter.js';
 import { getGitHubStats } from '../services/github.service.js';
@@ -15,7 +15,7 @@ router.get('/:identifier', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Identifier is required' });
     }
 
-    const matchedUser = findUserByIdentifier(identifier);
+    const matchedUser = findUserByIdentifier(identifier) || (req.query.email ? getUserByEmail(req.query.email) : null);
 
     // Determine coding handles from registered user or query overrides
     let lcUser = matchedUser?.handles?.leetcode || req.query.lc || '';
@@ -177,7 +177,7 @@ router.get('/:identifier', async (req, res) => {
         ...(cfStats.rating > 0 ? [{ label: `CF Rating: ${cfStats.rating} (${cfStats.rank})`, icon: "TrendingUp", color: "indigo" }] : []),
         ...(ghStats?.profile?.totalCommitsLastYear > 50 ? [{ label: "Active Open-Source Contributor", icon: "GitCommit", color: "emerald" }] : [])
       ],
-      canonicalUrl: `https://placement-preparation-dashboard-five.vercel.app/u/${encodeURIComponent(identifier)}`,
+      canonicalUrl: `https://placement-preparation-dashboard-five.vercel.app/u/${encodeURIComponent(matchedUser?.username || identifier)}`,
       lastUpdated: new Date().toISOString()
     };
 

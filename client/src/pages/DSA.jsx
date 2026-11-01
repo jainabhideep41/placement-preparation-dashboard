@@ -3,14 +3,10 @@ import {
   Code2, 
   Search, 
   Plus, 
-  Filter, 
   ExternalLink, 
-  RotateCw, 
   CheckCircle, 
   CheckCircle2,
   Circle,
-  Clock, 
-  Layers, 
   Sparkles, 
   Trophy, 
   Activity, 
@@ -21,7 +17,6 @@ import {
   Trash2
 } from 'lucide-react';
 import { useSearchParams, useLocation } from 'react-router-dom';
-import { MetricCard } from '../components/common/MetricCard';
 import { ProgressBar } from '../components/common/ProgressBar';
 import { Badge, DifficultyBadge, StatusBadge } from '../components/common/Badge';
 import { LoadingSkeleton, EmptyState } from '../components/common/LoadingSkeleton';
@@ -50,7 +45,6 @@ export function DSA({ dsaHook }) {
   const {
     data,
     loading,
-    problems,
     allProblems,
     dueRevisionCount,
     filters,
@@ -207,7 +201,6 @@ export function DSA({ dsaHook }) {
   }
 
   const platforms = data?.platforms || {};
-  const topics = data?.topics || [];
   const sheets = data?.sheets || [];
   const stats = data?.stats || {};
 
@@ -323,6 +316,10 @@ export function DSA({ dsaHook }) {
         await deleteProblem(matchingInAll.id);
       } else if (problem.id) {
         await deleteProblem(problem.id);
+      } else if (problem.canonicalKey) {
+        await deleteProblem(problem.canonicalKey);
+      } else if (problem.title) {
+        await deleteProblem(problem.title);
       }
     } catch (err) {
       console.error('Safe delete error:', err);

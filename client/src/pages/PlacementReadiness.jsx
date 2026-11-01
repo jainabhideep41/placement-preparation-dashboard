@@ -117,7 +117,7 @@ export function PlacementReadiness({ dashboardData, onNavigate }) {
     const updated = saveUserToRegistry({
       ...currentUser,
       targetRole: activeRoleConfig.title
-    });
+    }, true);
     setCurrentUser(updated);
 
     try {

@@ -24,13 +24,18 @@ router.get('/', (req, res) => {
   const completedAll = enrichedRoadmaps.reduce((acc, r) => acc + r.completed, 0);
   const overallPercentage = totalAll > 0 ? Math.round((completedAll / totalAll) * 100) : 0;
 
-  res.json({
-    success: true,
+  const payload = {
     overallPercentage,
     completedAll,
     totalAll,
     roadmaps: enrichedRoadmaps,
     projects: webDevState.projects
+  };
+
+  res.json({
+    success: true,
+    ...payload,
+    data: payload
   });
 });
 
