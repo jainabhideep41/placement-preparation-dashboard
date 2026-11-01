@@ -40,6 +40,15 @@ import { findUserByIdentifier } from '../utils/accountManager';
 import { JakeResumeModal } from '../components/profile/JakeResumeModal';
 import { GitHubContributionHeatmap } from '../components/github/GitHubContributionHeatmap';
 
+function sanitizeHandle(handle) {
+  if (!handle) return '';
+  let str = String(handle).trim();
+  str = str.replace(/^https?:\/\/[^/]+\/(?:u\/|profile\/)?/i, '');
+  str = str.replace(/^(?:u\/|@)/i, '');
+  str = str.replace(/\/+$/, '');
+  return str;
+}
+
 export function PublicProfile({ currentUser }) {
   const { username } = useParams();
   const [searchParams] = useSearchParams();
@@ -450,44 +459,53 @@ export function PublicProfile({ currentUser }) {
 
                 {/* External Social / Coding Platform Handles */}
                 <div className="flex flex-wrap items-center gap-2 pt-2">
-                  {profile.handles?.leetcode && (
-                    <a
-                      href={`https://leetcode.com/${profile.handles.leetcode}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 font-mono text-xs font-bold px-2.5 py-1 bg-amber-50 text-amber-950 border border-black rounded hover:bg-amber-100 transition-colors shadow-[1px_1px_0px_0px_#000]"
-                    >
-                      <Code2 className="w-3.5 h-3.5 text-amber-600" />
-                      <span>leetcode/{profile.handles.leetcode}</span>
-                      <ArrowUpRight className="w-3 h-3 text-black/40" />
-                    </a>
-                  )}
+                  {Boolean(profile.handles?.leetcode) && (() => {
+                    const cleanLc = sanitizeHandle(profile.handles.leetcode);
+                    return cleanLc ? (
+                      <a
+                        href={`https://leetcode.com/u/${cleanLc}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 font-mono text-xs font-bold px-2.5 py-1 bg-amber-50 text-amber-950 border border-black rounded hover:bg-amber-100 transition-colors shadow-[1px_1px_0px_0px_#000]"
+                      >
+                        <Code2 className="w-3.5 h-3.5 text-amber-600" />
+                        <span>leetcode/u/{cleanLc}</span>
+                        <ArrowUpRight className="w-3 h-3 text-black/40" />
+                      </a>
+                    ) : null;
+                  })()}
 
-                  {profile.handles?.codeforces && (
-                    <a
-                      href={`https://codeforces.com/profile/${profile.handles.codeforces}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 font-mono text-xs font-bold px-2.5 py-1 bg-blue-50 text-blue-950 border border-black rounded hover:bg-blue-100 transition-colors shadow-[1px_1px_0px_0px_#000]"
-                    >
-                      <TrendingUp className="w-3.5 h-3.5 text-blue-600" />
-                      <span>cf/{profile.handles.codeforces}</span>
-                      <ArrowUpRight className="w-3 h-3 text-black/40" />
-                    </a>
-                  )}
+                  {Boolean(profile.handles?.codeforces) && (() => {
+                    const cleanCf = sanitizeHandle(profile.handles.codeforces);
+                    return cleanCf ? (
+                      <a
+                        href={`https://codeforces.com/profile/${cleanCf}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 font-mono text-xs font-bold px-2.5 py-1 bg-blue-50 text-blue-950 border border-black rounded hover:bg-blue-100 transition-colors shadow-[1px_1px_0px_0px_#000]"
+                      >
+                        <TrendingUp className="w-3.5 h-3.5 text-blue-600" />
+                        <span>cf/{cleanCf}</span>
+                        <ArrowUpRight className="w-3 h-3 text-black/40" />
+                      </a>
+                    ) : null;
+                  })()}
 
-                  {profile.handles?.github && (
-                    <a
-                      href={`https://github.com/${profile.handles.github}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 font-mono text-xs font-bold px-2.5 py-1 bg-neutral-100 text-neutral-900 border border-black rounded hover:bg-neutral-200 transition-colors shadow-[1px_1px_0px_0px_#000]"
-                    >
-                      <GitCommit className="w-3.5 h-3.5 text-neutral-800" />
-                      <span>github/{profile.handles.github}</span>
-                      <ArrowUpRight className="w-3 h-3 text-black/40" />
-                    </a>
-                  )}
+                  {Boolean(profile.handles?.github) && (() => {
+                    const cleanGh = sanitizeHandle(profile.handles.github);
+                    return cleanGh ? (
+                      <a
+                        href={`https://github.com/${cleanGh}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 font-mono text-xs font-bold px-2.5 py-1 bg-neutral-100 text-neutral-900 border border-black rounded hover:bg-neutral-200 transition-colors shadow-[1px_1px_0px_0px_#000]"
+                      >
+                        <GitCommit className="w-3.5 h-3.5 text-neutral-800" />
+                        <span>github/{cleanGh}</span>
+                        <ArrowUpRight className="w-3 h-3 text-black/40" />
+                      </a>
+                    ) : null;
+                  })()}
                 </div>
 
                 {/* Contact Information & Privacy Badges */}

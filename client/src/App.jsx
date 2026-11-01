@@ -170,11 +170,6 @@ export function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // If first-time OAuth onboarding is active, show the OnboardingModal
-  if (onboardingUser) {
-    return <OnboardingModal user={onboardingUser} onComplete={handleCompleteOnboarding} />;
-  }
-
   // Ensure currentUser has a valid sanitized username at all times
   useEffect(() => {
     if (currentUser && !currentUser.username && currentUser.email) {
@@ -184,6 +179,11 @@ export function App() {
       saveUserToRegistry(updatedUser);
     }
   }, [currentUser, setCurrentUser]);
+
+  // If first-time OAuth onboarding is active, show the OnboardingModal
+  if (onboardingUser) {
+    return <OnboardingModal user={onboardingUser} onComplete={handleCompleteOnboarding} />;
+  }
 
   // Check if viewing a standalone public profile route
   const isProfileRoute = location.pathname.startsWith('/u') || location.pathname.startsWith('/profile');

@@ -141,13 +141,14 @@ export function calculateReadiness({
     : 0;
 
   // Calibrated Overall Score calculation using dynamic weights
-  const totalWeight = (W.dsa || 0) + (W.webDev || 0) + (W.systemDesign || 0) + (W.projects || 0) + (W.developerActivity || 0) || 100;
+  const devWeight = W.developerActivity !== undefined ? W.developerActivity : (W.devActivity || 0);
+  const totalWeight = (W.dsa || 0) + (W.webDev || 0) + (W.systemDesign || 0) + (W.projects || 0) + devWeight || 100;
   const overallScore = Math.round(
     ((dsaScore * (W.dsa || 0)) +
      (webDevScore * (W.webDev || 0)) +
      (sysScore * (W.systemDesign || 0)) +
      (projectScore * (W.projects || 0)) +
-     (devScore * (W.developerActivity || 0))) / totalWeight
+     (devScore * devWeight)) / totalWeight
   );
 
   // Determine readiness status tier
@@ -167,7 +168,7 @@ export function calculateReadiness({
   // Multi-pillar breakdown
   const pillars = [
     { name: 'System Design', score: sysScore, weight: `${W.systemDesign}%` },
-    { name: 'Developer Activity', score: devScore, weight: `${W.developerActivity}%` },
+    { name: 'Developer Activity', score: devScore, weight: `${devWeight}%` },
     { name: 'Web Development', score: webDevScore, weight: `${W.webDev}%` },
     { name: 'Projects', score: projectScore, weight: `${W.projects}%` },
     { name: 'DSA', score: dsaScore, weight: `${W.dsa}%` }

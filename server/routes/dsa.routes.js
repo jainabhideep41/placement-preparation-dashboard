@@ -287,7 +287,7 @@ router.post('/problems', (req, res) => {
   };
 
   const saved = addProblemToStore(newProblem);
-  res.status(201).json({ success: true, problem: saved });
+  res.status(201).json({ success: true, problem: saved, data: saved });
 });
 
 router.patch('/problems/:id', (req, res) => {
@@ -297,7 +297,7 @@ router.patch('/problems/:id', (req, res) => {
     return res.status(404).json({ success: false, message: 'Problem not found' });
   }
 
-  res.json({ success: true, problem: updated });
+  res.json({ success: true, problem: updated, data: updated });
 });
 
 router.delete('/problems/:id', (req, res) => {

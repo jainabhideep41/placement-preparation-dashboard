@@ -15,7 +15,13 @@ export function addProblemToStore(problem) {
 }
 
 export function updateProblemInStore(id, updates) {
-  const index = storedProblems.findIndex(p => p.id === id);
+  if (!id) return null;
+  const keyLower = String(id).toLowerCase();
+  const index = storedProblems.findIndex(p => 
+    p.id === id || 
+    p.canonicalKey === id || 
+    p.title?.toLowerCase() === keyLower
+  );
   if (index === -1) return null;
   storedProblems[index] = {
     ...storedProblems[index],

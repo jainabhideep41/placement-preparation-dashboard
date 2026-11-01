@@ -14,6 +14,15 @@ export function escapeLatex(str) {
     .replace(/\^/g, '\\textasciicircum{}');
 }
 
+export function sanitizeHandle(handle) {
+  if (!handle) return '';
+  let str = String(handle).trim();
+  str = str.replace(/^https?:\/\/[^/]+\/(?:u\/|profile\/|in\/)?/i, '');
+  str = str.replace(/^(?:u\/|@)/i, '');
+  str = str.replace(/\/+$/, '');
+  return str;
+}
+
 /**
  * Normalizes and extracts structured resume data from a candidate profile
  */
@@ -48,11 +57,11 @@ export function getResumeStructuredData(profile, options = {}) {
     : (profile?.privacy?.showPhone ?? false);
   const phone = showPhone ? rawPhone : null;
 
-  // Construct links
-  const linkedinHandle = handles.linkedin || profile?.identifier || 'candidate';
-  const githubHandle = handles.github || gh.username || profile?.identifier || 'github-user';
-  const leetcodeHandle = handles.leetcode || lc.username || profile?.identifier || 'leetcode-user';
-  const codeforcesHandle = handles.codeforces || cf.username || '';
+  // Construct sanitized links
+  const linkedinHandle = sanitizeHandle(handles.linkedin || profile?.identifier || 'candidate');
+  const githubHandle = sanitizeHandle(handles.github || gh.username || profile?.identifier || 'github-user');
+  const leetcodeHandle = sanitizeHandle(handles.leetcode || lc.username || profile?.identifier || 'leetcode-user');
+  const codeforcesHandle = sanitizeHandle(handles.codeforces || cf.username || '');
 
   // Standardize projects (minimum 2 high-impact software projects)
   const defaultProjects = [

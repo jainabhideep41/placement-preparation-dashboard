@@ -144,13 +144,14 @@ export function PlacementReadiness({ dashboardData, onNavigate }) {
   const devScore = breakdown.developerActivity?.score ?? 0;
 
   // Dynamically calculate overall score with calibrated weights
-  const totalWeight = weights.dsa + weights.webDev + weights.systemDesign + weights.projects + weights.devActivity || 100;
+  const devWeight = weights.devActivity !== undefined ? weights.devActivity : (weights.developerActivity || 0);
+  const totalWeight = (weights.dsa || 0) + (weights.webDev || 0) + (weights.systemDesign || 0) + (weights.projects || 0) + devWeight || 100;
   const dynamicOverallScore = Math.round(
-    (dsaScore * weights.dsa +
-      webDevScore * weights.webDev +
-      sysScore * weights.systemDesign +
-      projScore * weights.projects +
-      devScore * weights.devActivity) / totalWeight
+    (dsaScore * (weights.dsa || 0) +
+      webDevScore * (weights.webDev || 0) +
+      sysScore * (weights.systemDesign || 0) +
+      projScore * (weights.projects || 0) +
+      devScore * devWeight) / totalWeight
   );
 
   const radarPillars = [

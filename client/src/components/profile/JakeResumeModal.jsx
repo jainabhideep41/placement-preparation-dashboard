@@ -18,8 +18,6 @@ import {
 } from '../../utils/jakeResumeGenerator';
 
 export function JakeResumeModal({ isOpen, onClose, profile }) {
-  if (!isOpen || !profile) return null;
-
   const [activeTab, setActiveTab] = useState('preview'); // 'preview' | 'latex'
   const [copied, setCopied] = useState(false);
   const [includeEmail, setIncludeEmail] = useState(
@@ -28,6 +26,15 @@ export function JakeResumeModal({ isOpen, onClose, profile }) {
   const [includePhone, setIncludePhone] = useState(
     Boolean(profile?.privacy?.showPhone)
   );
+
+  React.useEffect(() => {
+    if (profile) {
+      setIncludeEmail(profile.privacy?.showEmail !== false);
+      setIncludePhone(Boolean(profile.privacy?.showPhone));
+    }
+  }, [profile]);
+
+  if (!isOpen || !profile) return null;
 
   const resumeOptions = { includeEmail, includePhone };
   const resumeData = getResumeStructuredData(profile, resumeOptions);

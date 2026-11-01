@@ -20,7 +20,7 @@ import {
   ChevronUp,
   Trash2
 } from 'lucide-react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useLocation } from 'react-router-dom';
 import { MetricCard } from '../components/common/MetricCard';
 import { ProgressBar } from '../components/common/ProgressBar';
 import { Badge, DifficultyBadge, StatusBadge } from '../components/common/Badge';
@@ -65,6 +65,7 @@ export function DSA({ dsaHook }) {
   } = dsaHook;
 
   const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
   const activeTab = searchParams.get('tab') || 'problems'; // 'problems' | 'platforms' | 'sheets' | 'topics'
   const setActiveTab = (tab) => {
     setSearchParams(prev => {
@@ -92,6 +93,17 @@ export function DSA({ dsaHook }) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [curatedSearchQuery, setCuratedSearchQuery] = useState('');
   const [expandedTopicId, setExpandedTopicId] = useState(null);
+
+  // Sync incoming search query or tab from Universal Search
+  useEffect(() => {
+    if (location.state?.tab) {
+      setActiveTab(location.state.tab);
+    }
+    if (location.state?.search) {
+      setSearchQuery(location.state.search);
+      setCuratedSearchQuery(location.state.search);
+    }
+  }, [location.state]);
 
   // Synchronized Canonical Solved Map across all sheets
   const [canonicalSolvedMap, setCanonicalSolvedMap] = useLocalCache(CANONICAL_STORAGE_KEY, {});
