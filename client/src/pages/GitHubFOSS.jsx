@@ -17,23 +17,26 @@ import {
 import { MetricCard } from '../components/common/MetricCard';
 import { Badge } from '../components/common/Badge';
 import { useLocalCache } from '../hooks/useLocalCache';
+import { GitHubContributionHeatmap } from '../components/github/GitHubContributionHeatmap';
 
 export function GitHubFOSS() {
+  const [currentUser] = useLocalCache('prep_auth_user', null);
   const [handles, setHandles] = useLocalCache('prep_user_handles', {
     codeforces: '',
     leetcode: '',
     github: ''
   });
 
+  const effectiveGithub = handles.github || currentUser?.handles?.github || '';
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('foss'); // 'foss' | 'repos'
-  const [customGhUser, setCustomGhUser] = useState(handles.github || '');
+  const [customGhUser, setCustomGhUser] = useState(effectiveGithub);
 
   const loadGitHub = async (username) => {
     setLoading(true);
     try {
-      const user = username !== undefined ? username : (handles.github || '');
+      const user = username !== undefined ? username : (handles.github || currentUser?.handles?.github || '');
       const endpoint = user ? `/api/github/${encodeURIComponent(user)}` : '/api/github/unlinked';
       const res = await fetch(endpoint);
       if (res.ok) {
@@ -48,8 +51,12 @@ export function GitHubFOSS() {
   };
 
   useEffect(() => {
-    loadGitHub(handles.github);
-  }, [handles.github]);
+    const userToLoad = handles.github || currentUser?.handles?.github || '';
+    if (userToLoad && !customGhUser) {
+      setCustomGhUser(userToLoad);
+    }
+    loadGitHub(userToLoad);
+  }, [handles.github, currentUser?.handles?.github]);
 
   if (loading || !data) {
     return (
@@ -66,28 +73,7 @@ export function GitHubFOSS() {
   const { profile = {}, fossContributions = [], repositories = [] } = data;
   const isLinked = Boolean(profile.username);
 
-  // Generate 36 weeks of activity squares
-  const activityWeeks = Array.from({ length: 36 }, (_, i) => {
-    return Array.from({ length: 7 }, (_, day) => {
-      if (!isLinked) return 0;
-      return Math.floor(Math.random() * 4);
-    });
-  });
 
-  const getHeatmapColor = (lvl) => {
-    switch (lvl) {
-      case 1:
-        return 'bg-emerald-200 border-emerald-300';
-      case 2:
-        return 'bg-emerald-400 border-emerald-500';
-      case 3:
-        return 'bg-emerald-600 border-emerald-700';
-      case 4:
-        return 'bg-emerald-800 border-emerald-900';
-      default:
-        return 'bg-black/5 border-black/5';
-    }
-  };
 
   return (
     <div className="space-y-6 animate-fadeIn font-sans">
@@ -193,41 +179,13 @@ export function GitHubFOSS() {
         </div>
       </div>
 
-      {/* Contribution Calendar Heatmap */}
-      <div className="p-6 rounded-3xl bg-white border-2 border-black space-y-3 shadow-[4px_4px_0px_rgba(0,0,0,1)]">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Calendar className="w-4 h-4 text-emerald-600" />
-            <h3 className="text-xs font-bold font-mono text-black uppercase tracking-wider">
-              Annual Contribution Heatmap ({profile.totalCommitsLastYear} contributions)
-            </h3>
-          </div>
-          <div className="flex items-center gap-1.5 text-[10px] font-mono text-black/50 font-bold">
-            <span>Less</span>
-            <span className="w-2.5 h-2.5 rounded bg-black/5 border border-black/10" />
-            <span className="w-2.5 h-2.5 rounded bg-emerald-200" />
-            <span className="w-2.5 h-2.5 rounded bg-emerald-400" />
-            <span className="w-2.5 h-2.5 rounded bg-emerald-600" />
-            <span className="w-2.5 h-2.5 rounded bg-emerald-800" />
-            <span>More</span>
-          </div>
-        </div>
-
-        {/* Heatmap grid */}
-        <div className="overflow-x-auto pb-2">
-          <div className="grid grid-flow-col grid-rows-7 gap-1 min-w-[720px]">
-            {activityWeeks.flatMap((week, wIdx) =>
-              week.map((level, dIdx) => (
-                <div
-                  key={`${wIdx}-${dIdx}`}
-                  className={`w-2.5 h-2.5 rounded-sm border ${getHeatmapColor(level)} transition-colors`}
-                  title={`Activity Level: ${level}`}
-                />
-              ))
-            )}
-          </div>
-        </div>
-      </div>
+      {/* Real GitHub Contribution Calendar Heatmap */}
+      <GitHubContributionHeatmap
+        username={profile.username || handles.github || customGhUser}
+        calendar={data.calendar}
+        totalContributions={profile.totalCommitsLastYear}
+        loading={loading}
+      />
 
       {/* Tab Controls */}
       <div className="flex border-b-2 border-black/10 gap-6 text-xs font-mono">

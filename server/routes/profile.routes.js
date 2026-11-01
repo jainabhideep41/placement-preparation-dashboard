@@ -156,7 +156,8 @@ router.get('/:identifier', async (req, res) => {
         totalCommitsLastYear: ghStats?.profile?.totalCommitsLastYear || 0,
         pullRequests: ghStats?.profile?.pullRequests || 0,
         mergedPullRequests: ghStats?.profile?.mergedPullRequests || 0,
-        totalStars: ghStats?.profile?.totalStars || 0
+        totalStars: ghStats?.profile?.totalStars || 0,
+        calendar: ghStats?.calendar || null
       },
       projects: defaultWebDevData.projects,
       systemDesign: {

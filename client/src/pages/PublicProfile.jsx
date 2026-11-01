@@ -38,6 +38,7 @@ import {
 } from 'lucide-react';
 import { findUserByIdentifier } from '../utils/accountManager';
 import { JakeResumeModal } from '../components/profile/JakeResumeModal';
+import { GitHubContributionHeatmap } from '../components/github/GitHubContributionHeatmap';
 
 export function PublicProfile({ currentUser }) {
   const { username } = useParams();
@@ -744,6 +745,7 @@ export function PublicProfile({ currentUser }) {
           {[
             { id: 'overview', label: 'All-Rounder Overview', icon: Layers },
             { id: 'dsa', label: 'DSA & Competitive Coding', icon: Code2 },
+            { id: 'github', label: 'GitHub Activity & Heatmap', icon: GitCommit },
             { id: 'projects', label: 'Verified Systems Projects', icon: Cpu },
             { id: 'system-design', label: 'System Design Competencies', icon: Database }
           ].map((tab) => {
@@ -925,6 +927,29 @@ export function PublicProfile({ currentUser }) {
                 ))}
               </div>
             </div>
+          </section>
+        )}
+
+        {/* Tab: GitHub Contribution Heatmap */}
+        {(activeTab === 'overview' || activeTab === 'github') && (
+          <section className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-black tracking-tight">Verified GitHub Contribution Heatmap</h2>
+                <p className="font-mono text-xs text-neutral-600">
+                  Annual commit frequency and open-source contribution calendar synchronized directly from GitHub
+                </p>
+              </div>
+              <span className="font-mono text-xs font-bold px-2.5 py-1 bg-white border border-black rounded shadow-[2px_2px_0px_0px_#000]">
+                {profile.github?.totalCommitsLastYear || 0} Contributions
+              </span>
+            </div>
+
+            <GitHubContributionHeatmap
+              username={profile.handles?.github || profile.github?.username}
+              calendar={profile.github?.calendar}
+              totalContributions={profile.github?.totalCommitsLastYear}
+            />
           </section>
         )}
 
