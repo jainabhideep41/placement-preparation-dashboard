@@ -43,7 +43,7 @@ Rather than a generic attendance counter or subjective slider, PREPSTACK combine
 
 ## 2. Visual & Architectural Design
 
-- **Visual Direction:** Inspired by **CP Companion** (dark technical aesthetic, high information density, clean typography, responsive layout).
+- **Visual Direction:** Inspired by a dark technical aesthetic, high information density, clean typography, responsive layout.
 - **DSA Architecture:** Inspired by **Codolio** (unified coding-platform tracking, sheets, topic-wise progress, difficulty distribution).
 
 ---
@@ -92,22 +92,3 @@ Open **`http://localhost:5173`** in your browser.
 
 ---
 
-## 5. Viva Defense / Examiner Q&A Guide (Section 64)
-
-### Q1: "What is your project?"
-> A placement preparation platform that synthesizes competitive programming metrics, web development roadmaps, system design concepts, and GitHub open-source contributions into a unified, actionable readiness score.
-
-### Q2: "Why React.js and Hooks?"
-> The project sheet specifically required React and Hooks. A dashboard is inherently component-based. Reusable cards, progress bars, and custom hooks (`useDashboardData`, `useDSAData`, `useProgress`) allow modular code, reactive state updates, and clean conditional rendering without page reloads.
-
-### Q3: "How does the caching architecture work?"
-> We implement a 3-tier caching model:
-> 1. Level 1: Active React component state for instant user interactions.
-> 2. Level 2: Browser `localStorage` for cross-session offline persistence.
-> 3. Level 3: Node.js server in-memory cache with configurable TTLs (15–30 min) to avoid rate limiting and reduce external API latency.
-
-### Q4: "How does the system avoid double-counting problems?"
-> The tracker separates *platform solves* (e.g. 482 on LeetCode + 326 on Codeforces) from *unique tracked problems*. Canonical problems are indexed by title/pattern so practice on multiple platforms does not distort the unique problem metric.
-
-### Q5: "How does it scale to production?"
-> In a production deployment, static frontend assets are served globally via an Edge CDN. The Node.js API instances run statelessly behind an L7 Load Balancer, backed by a shared Redis distributed cache and persistent database.
