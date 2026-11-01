@@ -1,23 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { 
-  Award, 
   Sparkles, 
-  Sliders, 
   AlertTriangle, 
-  CheckCircle, 
   CheckCircle2,
-  TrendingUp, 
-  ShieldCheck,
   Calendar,
-  Layers,
   ArrowRight,
   Briefcase,
-  Code2,
-  Cpu,
   Save,
   Check,
-  Star
+  RotateCcw,
+  SlidersHorizontal,
+  Minus,
+  Plus
 } from 'lucide-react';
 import { RadarChart } from '../components/common/Charts';
 import { ProgressBar } from '../components/common/ProgressBar';
@@ -76,7 +71,7 @@ export const CALIBRATED_ROLES = [
   }
 ];
 
-export function PlacementReadiness({ dashboardData, onNavigate }) {
+export function PlacementReadiness({ dashboardData, onNavigate, onRefreshDashboard }) {
   const [currentUser, setCurrentUser] = useLocalCache('prep_auth_user', null);
   const location = useLocation();
   const readiness = dashboardData?.readiness || {};
@@ -91,8 +86,25 @@ export function PlacementReadiness({ dashboardData, onNavigate }) {
   const [selectedRole, setSelectedRole] = useState(initialRole.id);
   const [roleSavedSuccess, setRoleSavedSuccess] = useState(false);
 
-  // Interactive calibrated weights state
-  const [weights, setWeights] = useState(initialRole.weights);
+  // Initialize weights: prioritize saved custom weights from profile > role default weights
+  const getInitialWeights = () => {
+    if (currentUser?.customWeights) {
+      return {
+        dsa: currentUser.customWeights.dsa ?? 40,
+        webDev: currentUser.customWeights.webDev ?? 15,
+        systemDesign: currentUser.customWeights.systemDesign ?? 25,
+        projects: currentUser.customWeights.projects ?? 10,
+        devActivity: currentUser.customWeights.devActivity !== undefined 
+          ? currentUser.customWeights.devActivity 
+          : (currentUser.customWeights.developerActivity ?? 10)
+      };
+    }
+    return initialRole.weights;
+  };
+
+  const [weights, setWeights] = useState(getInitialWeights);
+  const [weightsSavedSuccess, setWeightsSavedSuccess] = useState(false);
+  const [savingWeights, setSavingWeights] = useState(false);
 
   // Sync incoming role from Universal Search
   useEffect(() => {
@@ -105,11 +117,98 @@ export function PlacementReadiness({ dashboardData, onNavigate }) {
     }
   }, [location.state]);
 
+  // Keep weights in sync if user changes or loads from cache
+  useEffect(() => {
+    if (currentUser?.customWeights) {
+      setWeights({
+        dsa: currentUser.customWeights.dsa ?? 40,
+        webDev: currentUser.customWeights.webDev ?? 15,
+        systemDesign: currentUser.customWeights.systemDesign ?? 25,
+        projects: currentUser.customWeights.projects ?? 10,
+        devActivity: currentUser.customWeights.devActivity !== undefined 
+          ? currentUser.customWeights.devActivity 
+          : (currentUser.customWeights.developerActivity ?? 10)
+      });
+    }
+  }, [currentUser?.email]);
+
   const activeRoleConfig = CALIBRATED_ROLES.find(r => r.id === selectedRole) || CALIBRATED_ROLES[0];
 
   const handleSelectRole = (role) => {
     setSelectedRole(role.id);
     setWeights(role.weights);
+  };
+
+  const handleResetWeights = () => {
+    setWeights(activeRoleConfig.weights);
+  };
+
+  const handleNormalizeWeights = () => {
+    const rawTotal = (weights.dsa || 0) + (weights.webDev || 0) + (weights.systemDesign || 0) + (weights.projects || 0) + (weights.devActivity || 10);
+    if (!rawTotal) return;
+    const factor = 100 / rawTotal;
+    const normDsa = Math.round((weights.dsa || 0) * factor);
+    const normWeb = Math.round((weights.webDev || 0) * factor);
+    const normSys = Math.round((weights.systemDesign || 0) * factor);
+    const normProj = Math.round((weights.projects || 0) * factor);
+    const normDev = Math.max(5, 100 - (normDsa + normWeb + normSys + normProj));
+
+    setWeights({
+      dsa: normDsa,
+      webDev: normWeb,
+      systemDesign: normSys,
+      projects: normProj,
+      devActivity: normDev
+    });
+  };
+
+  const handleSaveWeights = async () => {
+    if (!currentUser?.email) return;
+    setSavingWeights(true);
+
+    const devW = Number(weights.devActivity !== undefined ? weights.devActivity : (weights.developerActivity || 10));
+    const normalizedWeights = {
+      dsa: Number(weights.dsa || 40),
+      webDev: Number(weights.webDev || 15),
+      systemDesign: Number(weights.systemDesign || 25),
+      projects: Number(weights.projects || 10),
+      devActivity: devW,
+      developerActivity: devW
+    };
+
+    // 1. Update localStorage registry & auth user
+    const updated = saveUserToRegistry({
+      ...currentUser,
+      customWeights: normalizedWeights
+    }, true);
+    setCurrentUser(updated);
+
+    // 2. Invalidate stale dashboard cache
+    window.localStorage.removeItem('prep_dashboard_cache');
+
+    // 3. Persist to server backend
+    try {
+      await fetch('/api/auth/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: currentUser.email,
+          customWeights: normalizedWeights
+        })
+      });
+    } catch (e) {
+      console.warn('Backend custom weights persistence warning:', e);
+    }
+
+    // 4. Trigger live sync across dashboard and components
+    if (onRefreshDashboard) {
+      await onRefreshDashboard(null, null, normalizedWeights);
+    }
+    window.dispatchEvent(new CustomEvent('prep_refresh_dashboard', { detail: { weights: normalizedWeights } }));
+
+    setSavingWeights(false);
+    setWeightsSavedSuccess(true);
+    setTimeout(() => setWeightsSavedSuccess(false), 3500);
   };
 
   const handleSaveRoleToProfile = async () => {
@@ -294,103 +393,312 @@ export function PlacementReadiness({ dashboardData, onNavigate }) {
 
         {/* Pillar Breakdown & Dynamic Weight Adjuster (7 cols) */}
         <div className="lg:col-span-7 rounded-3xl bg-white border-2 border-black p-6 space-y-5 shadow-[4px_4px_0px_rgba(0,0,0,1)]">
-          <div className="flex items-center justify-between border-b border-black/10 pb-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-black/10 pb-4">
             <div>
-              <h3 className="text-sm font-bold text-black font-display">Pillar Scoring Breakdown</h3>
-              <p className="text-xs text-black/50">Calibrated specifically for {activeRoleConfig.title.split('—')[0]}</p>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-sm font-bold text-black font-display">Pillar Scoring Breakdown</h3>
+                <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border ${
+                  totalWeight === 100 
+                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
+                    : 'bg-amber-50 text-amber-800 border-amber-200'
+                }`}>
+                  Total: {totalWeight}%
+                </span>
+                {totalWeight !== 100 && (
+                  <button
+                    type="button"
+                    onClick={handleNormalizeWeights}
+                    className="text-[10px] font-mono font-bold text-blue-600 hover:text-blue-800 underline cursor-pointer"
+                    title="Scale weights proportionally so they sum to exactly 100%"
+                  >
+                    Auto-scale to 100%
+                  </button>
+                )}
+              </div>
+              <p className="text-xs text-black/50 mt-0.5">
+                Calibrated specifically for {activeRoleConfig.title.split('—')[0]}
+              </p>
             </div>
-            <button
-              onClick={() => setWeights(activeRoleConfig.weights)}
-              className="text-xs font-mono font-bold text-blue-600 hover:underline cursor-pointer"
-            >
-              Reset to Role Weights
-            </button>
+
+            <div className="flex items-center gap-2 self-start sm:self-auto">
+              <button
+                type="button"
+                onClick={handleResetWeights}
+                className="inline-flex items-center gap-1 text-xs font-mono font-bold text-black/60 hover:text-black hover:underline cursor-pointer transition-colors px-2 py-1 rounded-lg hover:bg-black/5"
+                title="Reset sliders back to company role benchmark weights"
+              >
+                <RotateCcw className="w-3 h-3" />
+                <span>Reset Defaults</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleSaveWeights}
+                disabled={savingWeights}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-black hover:bg-neutral-800 text-white font-mono text-xs font-bold shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-0.5 transition-all cursor-pointer disabled:opacity-60"
+                title="Save your custom weights to your account so they persist every time you sign in"
+              >
+                {weightsSavedSuccess ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                    <span className="text-emerald-400">Weightage Saved!</span>
+                  </>
+                ) : savingWeights ? (
+                  <>
+                    <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Saving...</span>
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-3.5 h-3.5 text-white" />
+                    <span>Save Weightage</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
 
           {/* 1. DSA */}
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 p-3 rounded-2xl bg-[#F9F9F7] border border-black/10">
             <div className="flex items-center justify-between text-xs">
-              <span className="font-bold text-black">1. Data Structures & Algorithms</span>
+              <span className="font-bold text-black">1. Data Structures &amp; Algorithms</span>
               <span className="font-mono text-blue-600 font-extrabold">{dsaScore}% (Weight: {weights.dsa}%)</span>
             </div>
             <ProgressBar value={dsaScore} max={100} showPercentage={false} color="blue" height="h-2.5" />
-            <input
-              type="range"
-              min="5"
-              max="60"
-              value={weights.dsa}
-              onChange={(e) => setWeights({ ...weights, dsa: Number(e.target.value) })}
-              className="w-full accent-blue-600 h-1.5 bg-black/10 rounded cursor-pointer"
-            />
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setWeights(prev => ({ ...prev, dsa: Math.max(5, (prev.dsa || 0) - 5) }))}
+                className="w-6 h-6 rounded-md bg-white border border-black/20 hover:border-black flex items-center justify-center text-xs font-mono font-bold text-black shadow-2xs hover:bg-neutral-50"
+                title="Decrease by 5%"
+              >
+                <Minus className="w-3 h-3" />
+              </button>
+              <input
+                type="range"
+                min="5"
+                max="65"
+                value={weights.dsa}
+                onChange={(e) => setWeights({ ...weights, dsa: Number(e.target.value) })}
+                className="flex-1 accent-blue-600 h-1.5 bg-black/10 rounded cursor-pointer"
+              />
+              <button
+                type="button"
+                onClick={() => setWeights(prev => ({ ...prev, dsa: Math.min(65, (prev.dsa || 0) + 5) }))}
+                className="w-6 h-6 rounded-md bg-white border border-black/20 hover:border-black flex items-center justify-center text-xs font-mono font-bold text-black shadow-2xs hover:bg-neutral-50"
+                title="Increase by 5%"
+              >
+                <Plus className="w-3 h-3" />
+              </button>
+              <span className="font-mono text-xs font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded min-w-[42px] text-center">
+                {weights.dsa}%
+              </span>
+            </div>
           </div>
 
           {/* 2. Web Dev */}
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 p-3 rounded-2xl bg-[#F9F9F7] border border-black/10">
             <div className="flex items-center justify-between text-xs">
               <span className="font-bold text-black">2. Web Development Engineering</span>
               <span className="font-mono text-cyan-600 font-extrabold">{webDevScore}% (Weight: {weights.webDev}%)</span>
             </div>
             <ProgressBar value={webDevScore} max={100} showPercentage={false} color="cyan" height="h-2.5" />
-            <input
-              type="range"
-              min="5"
-              max="50"
-              value={weights.webDev}
-              onChange={(e) => setWeights({ ...weights, webDev: Number(e.target.value) })}
-              className="w-full accent-cyan-600 h-1.5 bg-black/10 rounded cursor-pointer"
-            />
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setWeights(prev => ({ ...prev, webDev: Math.max(5, (prev.webDev || 0) - 5) }))}
+                className="w-6 h-6 rounded-md bg-white border border-black/20 hover:border-black flex items-center justify-center text-xs font-mono font-bold text-black shadow-2xs hover:bg-neutral-50"
+                title="Decrease by 5%"
+              >
+                <Minus className="w-3 h-3" />
+              </button>
+              <input
+                type="range"
+                min="5"
+                max="55"
+                value={weights.webDev}
+                onChange={(e) => setWeights({ ...weights, webDev: Number(e.target.value) })}
+                className="flex-1 accent-cyan-600 h-1.5 bg-black/10 rounded cursor-pointer"
+              />
+              <button
+                type="button"
+                onClick={() => setWeights(prev => ({ ...prev, webDev: Math.min(55, (prev.webDev || 0) + 5) }))}
+                className="w-6 h-6 rounded-md bg-white border border-black/20 hover:border-black flex items-center justify-center text-xs font-mono font-bold text-black shadow-2xs hover:bg-neutral-50"
+                title="Increase by 5%"
+              >
+                <Plus className="w-3 h-3" />
+              </button>
+              <span className="font-mono text-xs font-bold text-cyan-700 bg-cyan-50 border border-cyan-200 px-2 py-0.5 rounded min-w-[42px] text-center">
+                {weights.webDev}%
+              </span>
+            </div>
           </div>
 
           {/* 3. System Design */}
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 p-3 rounded-2xl bg-[#F9F9F7] border border-black/10">
             <div className="flex items-center justify-between text-xs">
-              <span className="font-bold text-black">3. System Design & Scalability</span>
+              <span className="font-bold text-black">3. System Design &amp; Scalability</span>
               <span className="font-mono text-purple-600 font-extrabold">{sysScore}% (Weight: {weights.systemDesign}%)</span>
             </div>
             <ProgressBar value={sysScore} max={100} showPercentage={false} color="purple" height="h-2.5" />
-            <input
-              type="range"
-              min="5"
-              max="40"
-              value={weights.systemDesign}
-              onChange={(e) => setWeights({ ...weights, systemDesign: Number(e.target.value) })}
-              className="w-full accent-purple-600 h-1.5 bg-black/10 rounded cursor-pointer"
-            />
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setWeights(prev => ({ ...prev, systemDesign: Math.max(5, (prev.systemDesign || 0) - 5) }))}
+                className="w-6 h-6 rounded-md bg-white border border-black/20 hover:border-black flex items-center justify-center text-xs font-mono font-bold text-black shadow-2xs hover:bg-neutral-50"
+                title="Decrease by 5%"
+              >
+                <Minus className="w-3 h-3" />
+              </button>
+              <input
+                type="range"
+                min="5"
+                max="50"
+                value={weights.systemDesign}
+                onChange={(e) => setWeights({ ...weights, systemDesign: Number(e.target.value) })}
+                className="flex-1 accent-purple-600 h-1.5 bg-black/10 rounded cursor-pointer"
+              />
+              <button
+                type="button"
+                onClick={() => setWeights(prev => ({ ...prev, systemDesign: Math.min(50, (prev.systemDesign || 0) + 5) }))}
+                className="w-6 h-6 rounded-md bg-white border border-black/20 hover:border-black flex items-center justify-center text-xs font-mono font-bold text-black shadow-2xs hover:bg-neutral-50"
+                title="Increase by 5%"
+              >
+                <Plus className="w-3 h-3" />
+              </button>
+              <span className="font-mono text-xs font-bold text-purple-700 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded min-w-[42px] text-center">
+                {weights.systemDesign}%
+              </span>
+            </div>
           </div>
 
           {/* 4. Projects */}
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 p-3 rounded-2xl bg-[#F9F9F7] border border-black/10">
             <div className="flex items-center justify-between text-xs">
               <span className="font-bold text-black">4. Project Portfolio Evidence</span>
               <span className="font-mono text-emerald-700 font-extrabold">{projScore}% (Weight: {weights.projects}%)</span>
             </div>
             <ProgressBar value={projScore} max={100} showPercentage={false} color="emerald" height="h-2.5" />
-            <input
-              type="range"
-              min="5"
-              max="35"
-              value={weights.projects}
-              onChange={(e) => setWeights({ ...weights, projects: Number(e.target.value) })}
-              className="w-full accent-emerald-600 h-1.5 bg-black/10 rounded cursor-pointer"
-            />
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setWeights(prev => ({ ...prev, projects: Math.max(5, (prev.projects || 0) - 5) }))}
+                className="w-6 h-6 rounded-md bg-white border border-black/20 hover:border-black flex items-center justify-center text-xs font-mono font-bold text-black shadow-2xs hover:bg-neutral-50"
+                title="Decrease by 5%"
+              >
+                <Minus className="w-3 h-3" />
+              </button>
+              <input
+                type="range"
+                min="5"
+                max="40"
+                value={weights.projects}
+                onChange={(e) => setWeights({ ...weights, projects: Number(e.target.value) })}
+                className="flex-1 accent-emerald-600 h-1.5 bg-black/10 rounded cursor-pointer"
+              />
+              <button
+                type="button"
+                onClick={() => setWeights(prev => ({ ...prev, projects: Math.min(40, (prev.projects || 0) + 5) }))}
+                className="w-6 h-6 rounded-md bg-white border border-black/20 hover:border-black flex items-center justify-center text-xs font-mono font-bold text-black shadow-2xs hover:bg-neutral-50"
+                title="Increase by 5%"
+              >
+                <Plus className="w-3 h-3" />
+              </button>
+              <span className="font-mono text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded min-w-[42px] text-center">
+                {weights.projects}%
+              </span>
+            </div>
           </div>
 
           {/* 5. GitHub / FOSS */}
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 p-3 rounded-2xl bg-[#F9F9F7] border border-black/10">
             <div className="flex items-center justify-between text-xs">
-              <span className="font-bold text-black">5. GitHub & FOSS Developer Activity</span>
+              <span className="font-bold text-black">5. GitHub &amp; FOSS Developer Activity</span>
               <span className="font-mono text-amber-700 font-extrabold">{devScore}% (Weight: {weights.devActivity}%)</span>
             </div>
             <ProgressBar value={devScore} max={100} showPercentage={false} color="amber" height="h-2.5" />
-            <input
-              type="range"
-              min="5"
-              max="30"
-              value={weights.devActivity}
-              onChange={(e) => setWeights({ ...weights, devActivity: Number(e.target.value) })}
-              className="w-full accent-amber-500 h-1.5 bg-black/10 rounded cursor-pointer"
-            />
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setWeights(prev => ({ ...prev, devActivity: Math.max(5, (prev.devActivity || 0) - 5) }))}
+                className="w-6 h-6 rounded-md bg-white border border-black/20 hover:border-black flex items-center justify-center text-xs font-mono font-bold text-black shadow-2xs hover:bg-neutral-50"
+                title="Decrease by 5%"
+              >
+                <Minus className="w-3 h-3" />
+              </button>
+              <input
+                type="range"
+                min="5"
+                max="35"
+                value={weights.devActivity}
+                onChange={(e) => setWeights({ ...weights, devActivity: Number(e.target.value) })}
+                className="flex-1 accent-amber-500 h-1.5 bg-black/10 rounded cursor-pointer"
+              />
+              <button
+                type="button"
+                onClick={() => setWeights(prev => ({ ...prev, devActivity: Math.min(35, (prev.devActivity || 0) + 5) }))}
+                className="w-6 h-6 rounded-md bg-white border border-black/20 hover:border-black flex items-center justify-center text-xs font-mono font-bold text-black shadow-2xs hover:bg-neutral-50"
+                title="Increase by 5%"
+              >
+                <Plus className="w-3 h-3" />
+              </button>
+              <span className="font-mono text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded min-w-[42px] text-center">
+                {weights.devActivity}%
+              </span>
+            </div>
           </div>
+
+          {/* Bottom Action Footer with Live Score and Persistent Save */}
+          <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-black/10">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-black/60 font-mono">Calibrated Diagnostic:</span>
+              <span className="font-mono text-sm font-extrabold text-black">{dynamicOverallScore}%</span>
+              <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded border ${
+                dynamicOverallScore >= 80 
+                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
+                  : dynamicOverallScore >= 60 
+                    ? 'bg-blue-50 text-blue-800 border-blue-200' 
+                    : 'bg-amber-50 text-amber-800 border-amber-200'
+              }`}>
+                {dynamicOverallScore >= 85 ? 'FAANG Ready' : dynamicOverallScore >= 70 ? 'Competitive Track' : 'Needs Preparation'}
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleSaveWeights}
+              disabled={savingWeights}
+              className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-black hover:bg-neutral-800 text-white font-mono text-xs font-bold shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-0.5 transition-all cursor-pointer disabled:opacity-60"
+            >
+              {weightsSavedSuccess ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-emerald-400" />
+                  <span className="text-emerald-400">Weightage Saved to Profile!</span>
+                </>
+              ) : savingWeights ? (
+                <>
+                  <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <span>Saving Weightage...</span>
+                </>
+              ) : (
+                <>
+                  <Save className="w-3.5 h-3.5 text-white" />
+                  <span>Save Weightage to Profile</span>
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* Confirmation Alert */}
+          {weightsSavedSuccess && (
+            <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-mono flex items-center justify-between animate-fadeIn">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>Weightage saved to profile! The updated weightage is now active across Dashboard KPI cards, Navbar, and Sprint queues.</span>
+              </div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded shrink-0">Saved</span>
+            </div>
+          )}
         </div>
       </div>
 

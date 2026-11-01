@@ -95,6 +95,7 @@ export function App() {
             ...existingRegistryUser,
             name: existingRegistryUser?.name || authenticatedUser.name,
             targetRole: existingRegistryUser?.targetRole || authenticatedUser.targetRole,
+            customWeights: existingRegistryUser?.customWeights || authenticatedUser.customWeights || null,
             handles: {
               leetcode: existingRegistryUser?.handles?.leetcode || authenticatedUser.handles?.leetcode || '',
               codeforces: existingRegistryUser?.handles?.codeforces || authenticatedUser.handles?.codeforces || '',
@@ -291,6 +292,7 @@ export function App() {
                   <PlacementReadiness
                     dashboardData={dashboardHook.data}
                     onNavigate={handleNavigate}
+                    onRefreshDashboard={dashboardHook.refresh}
                   />
                 }
               />

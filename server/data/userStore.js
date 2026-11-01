@@ -140,6 +140,9 @@ export function saveOrMergeUser(userData) {
         codeforces: (isExplicit && userData.handles?.codeforces !== undefined ? userData.handles.codeforces : (existing.handles?.codeforces || userData.handles?.codeforces || '')),
         github: (isExplicit && userData.handles?.github !== undefined ? userData.handles.github : (existing.handles?.github || userData.handles?.github || ''))
       },
+      customWeights: (isExplicit && userData.customWeights !== undefined)
+        ? userData.customWeights
+        : (userData.customWeights || existing.customWeights || null),
       onboardingCompleted: existing.onboardingCompleted ?? Boolean(
         existing.handles?.leetcode || existing.handles?.codeforces || existing.handles?.github
       ),
@@ -184,6 +187,7 @@ export function saveOrMergeUser(userData) {
       codeforces: userData.handles?.codeforces || '',
       github: userData.handles?.github || ''
     },
+    customWeights: userData.customWeights || null,
     onboardingCompleted: userData.onboardingCompleted || false,
     registeredAt: new Date().toISOString(),
     lastLoginAt: new Date().toISOString()
@@ -221,6 +225,7 @@ export function updateUserProfile(email, profileData = {}) {
   if (profileData.targetRole) user.targetRole = profileData.targetRole.trim();
   if (profileData.avatarUrl) user.avatarUrl = profileData.avatarUrl.trim();
   if (profileData.phone !== undefined) user.phone = profileData.phone.trim();
+  if (profileData.customWeights !== undefined) user.customWeights = profileData.customWeights;
   if (profileData.privacy) {
     user.privacy = {
       showEmail: profileData.privacy.showEmail !== undefined ? Boolean(profileData.privacy.showEmail) : (user.privacy?.showEmail ?? true),

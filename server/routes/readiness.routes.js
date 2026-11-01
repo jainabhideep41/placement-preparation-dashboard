@@ -9,7 +9,16 @@ import { calculateReadiness } from '../services/readiness.service.js';
 const router = Router();
 
 router.get('/', async (req, res) => {
-  let { cf_user = '', lc_user = '', gh_user = '', role = '', targetRole = '', email = '' } = req.query;
+  let { cf_user = '', lc_user = '', gh_user = '', role = '', targetRole = '', email = '', weights = '' } = req.query;
+
+  let customWeights = null;
+  if (weights) {
+    try {
+      customWeights = typeof weights === 'string' ? JSON.parse(weights) : weights;
+    } catch (e) {
+      // ignore parse failure
+    }
+  }
 
   if (email) {
     const regUser = getUserByEmail(email);
@@ -18,6 +27,7 @@ router.get('/', async (req, res) => {
       if (!lc_user && regUser.handles?.leetcode) lc_user = regUser.handles.leetcode;
       if (!gh_user && regUser.handles?.github) gh_user = regUser.handles.github;
       if (!role && !targetRole && regUser.targetRole) role = regUser.targetRole;
+      if (!customWeights && regUser.customWeights) customWeights = regUser.customWeights;
     }
   }
 
@@ -42,7 +52,8 @@ router.get('/', async (req, res) => {
       webDev: defaultWebDevData,
       systemDesign: defaultSystemDesignData,
       github: gh,
-      targetRole: role || targetRole || 'Software Development Engineer (SDE-1)'
+      targetRole: role || targetRole || 'Software Development Engineer (SDE-1)',
+      customWeights
     });
 
     res.json({

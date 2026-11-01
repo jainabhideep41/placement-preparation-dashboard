@@ -171,7 +171,10 @@ export function Dashboard({ dashboardData, loading, onNavigate, onRefreshAll }) 
         overallScore={overallScore}
         statusTier={statusTier}
         metrics={metrics}
-        calibratedRole={readiness?.calibratedRole}
+        calibratedRole={{
+          ...readiness?.calibratedRole,
+          weights: authProfile?.customWeights || readiness?.calibratedRole?.weights
+        }}
         onNavigate={onNavigate}
       />
 

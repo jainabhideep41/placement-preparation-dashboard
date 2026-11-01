@@ -246,7 +246,7 @@ export function PrimaryMetricCards({
             </div>
 
             <span className="text-[10px] font-bold font-mono px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-800 border border-neutral-300">
-              {weights.developerActivity || 10}% Weight
+              {weights.developerActivity !== undefined ? weights.developerActivity : (weights.devActivity || 10)}% Weight
             </span>
           </div>
 

@@ -12,7 +12,16 @@ import { calculateReadiness } from '../services/readiness.service.js';
 const router = Router();
 
 router.get('/', async (req, res) => {
-  let { cf_user = '', lc_user = '', gh_user = '', ac_user = '', hr_user = '', role = '', targetRole = '', email = '' } = req.query;
+  let { cf_user = '', lc_user = '', gh_user = '', ac_user = '', hr_user = '', role = '', targetRole = '', email = '', weights = '' } = req.query;
+
+  let customWeights = null;
+  if (weights) {
+    try {
+      customWeights = typeof weights === 'string' ? JSON.parse(weights) : weights;
+    } catch (e) {
+      // ignore parse failure
+    }
+  }
 
   if (email) {
     const registeredUser = getUserByEmail(email);
@@ -21,6 +30,7 @@ router.get('/', async (req, res) => {
       if (!lc_user && registeredUser.handles?.leetcode) lc_user = registeredUser.handles.leetcode;
       if (!gh_user && registeredUser.handles?.github) gh_user = registeredUser.handles.github;
       if (!role && !targetRole && registeredUser.targetRole) role = registeredUser.targetRole;
+      if (!customWeights && registeredUser.customWeights) customWeights = registeredUser.customWeights;
     }
   }
 
@@ -49,7 +59,8 @@ router.get('/', async (req, res) => {
       webDev: defaultWebDevData,
       systemDesign: defaultSystemDesignData,
       github: ghStats,
-      targetRole: role || targetRole || 'Software Development Engineer (SDE-1)'
+      targetRole: role || targetRole || 'Software Development Engineer (SDE-1)',
+      customWeights
     });
 
     const totalSolved = (lcStats.problemsSolved || 0) + 

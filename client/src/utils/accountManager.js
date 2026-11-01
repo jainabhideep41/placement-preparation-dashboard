@@ -96,6 +96,9 @@ export function saveUserToRegistry(user, isExplicitUpdate = false) {
           codeforces: existing?.handles?.codeforces || user.handles?.codeforces || '',
           github: existing?.handles?.github || user.handles?.github || ''
         },
+    customWeights: isExplicitUpdate
+      ? (user.customWeights !== undefined ? user.customWeights : (existing?.customWeights || null))
+      : (existing?.customWeights || user.customWeights || null),
     onboardingCompleted: existing?.onboardingCompleted || user.onboardingCompleted || Boolean(
       (existing?.handles?.leetcode || user.handles?.leetcode) ||
       (existing?.handles?.codeforces || user.handles?.codeforces) ||

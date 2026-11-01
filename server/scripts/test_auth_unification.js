@@ -150,7 +150,56 @@ async function runTests() {
   const readData = await readRes.json();
   console.log('Readiness API responded. Success:', readData.success, 'Overall score:', readData.readiness?.overallScore);
 
-  console.log('\n>>> ALL MULTI-PROVIDER AUTHENTICATION UNIFICATION TESTS PASSED SUCCESSFULLY! <<<');
+  // 6. Test Custom Weights Modification & Persistence across Login and API Routes
+  console.log('\n[Test 6] Test Custom Weights Update, Route Calibration & Sign-In Persistence...');
+  const customWeights = { dsa: 50, webDev: 20, systemDesign: 15, projects: 10, devActivity: 5, developerActivity: 5 };
+  const resWeights = await fetch(`${BASE_URL}/api/auth/profile`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email: testEmail,
+      customWeights
+    })
+  });
+  const dataWeights = await resWeights.json();
+  console.log('Custom weights update response:', dataWeights.success, dataWeights.user?.customWeights);
+  if (!dataWeights.success || dataWeights.user?.customWeights?.dsa !== 50) {
+    throw new Error('Test 6 Failed: Custom weights not saved in profile');
+  }
+
+  // Check Dashboard route uses custom weights
+  const dashWeightsRes = await fetch(`${BASE_URL}/api/dashboard?email=${encodeURIComponent(testEmail)}`);
+  const dashWeightsData = await dashWeightsRes.json();
+  console.log('Dashboard API with custom weights:');
+  console.log('  DSA Weight:', dashWeightsData.readiness?.weights?.dsa, '(Expected: 50)');
+  console.log('  Sys Design Weight:', dashWeightsData.readiness?.weights?.systemDesign, '(Expected: 15)');
+  if (dashWeightsData.readiness?.weights?.dsa !== 50) {
+    throw new Error('Test 6 Failed: Dashboard route did not use saved custom weights');
+  }
+
+  // Check Readiness route uses custom weights
+  const readWeightsRes = await fetch(`${BASE_URL}/api/readiness?email=${encodeURIComponent(testEmail)}`);
+  const readWeightsData = await readWeightsRes.json();
+  console.log('Readiness API with custom weights:');
+  console.log('  DSA Weight:', readWeightsData.readiness?.weights?.dsa, '(Expected: 50)');
+  if (readWeightsData.readiness?.weights?.dsa !== 50) {
+    throw new Error('Test 6 Failed: Readiness route did not use saved custom weights');
+  }
+
+  // Simulate user logging in again later via Google OAuth
+  const nextSessionUser = saveOrMergeUser({
+    id: 'google_session_next_day',
+    name: 'Linus Torvalds',
+    email: testEmail,
+    provider: 'google'
+  });
+  console.log('User next login session:');
+  console.log('  Persistent DSA Weight:', nextSessionUser.customWeights?.dsa, '(Expected: 50)');
+  if (nextSessionUser.customWeights?.dsa !== 50) {
+    throw new Error('Test 6 Failed: Custom weights did not persist across subsequent logins');
+  }
+
+  console.log('\n>>> ALL MULTI-PROVIDER AUTHENTICATION UNIFICATION & WEIGHTS PERSISTENCE TESTS PASSED! <<<');
 }
 
 runTests().catch(err => {

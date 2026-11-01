@@ -72,7 +72,8 @@ router.get('/:identifier', async (req, res) => {
       webDev: defaultWebDevData,
       systemDesign: defaultSystemDesignData,
       github: ghStats,
-      targetRole: targetRole || req.query.role || 'Software Development Engineer (SDE-1)'
+      targetRole: targetRole || req.query.role || 'Software Development Engineer (SDE-1)',
+      customWeights: matchedUser?.customWeights || null
     });
 
     const showEmail = matchedUser?.privacy?.showEmail !== undefined ? Boolean(matchedUser.privacy.showEmail) : true;

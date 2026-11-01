@@ -74,7 +74,13 @@ export function calculateReadiness({
   customWeights = null
 }) {
   const calibratedRole = getCalibratedRoleConfig(targetRole);
-  const W = customWeights || calibratedRole.weights;
+  const rawW = customWeights ? { ...calibratedRole.weights, ...customWeights } : calibratedRole.weights;
+  const normalizedDevWeight = rawW.developerActivity !== undefined ? rawW.developerActivity : (rawW.devActivity !== undefined ? rawW.devActivity : 10);
+  const W = {
+    ...rawW,
+    developerActivity: normalizedDevWeight,
+    devActivity: normalizedDevWeight
+  };
 
   // 1. DSA Score (Benchmark: ~500 total solves, contest rating)
   const lc = dsa.platforms?.leetcode || {};

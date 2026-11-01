@@ -845,7 +845,7 @@ router.get('/user/:email', (req, res) => {
  * Updates public username, academic credentials (CGPA, college, graduation year), handles, and target role
  */
 router.post('/profile', (req, res) => {
-  const { email, username, name, targetRole, academic, handles, avatarUrl, phone, privacy } = req.body;
+  const { email, username, name, targetRole, academic, handles, avatarUrl, phone, privacy, customWeights } = req.body;
   if (!email) {
     return res.status(400).json({ success: false, message: 'User email is required' });
   }
@@ -859,7 +859,8 @@ router.post('/profile', (req, res) => {
       handles,
       avatarUrl,
       phone,
-      privacy
+      privacy,
+      customWeights
     });
 
     if (!updated) {
