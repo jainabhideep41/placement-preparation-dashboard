@@ -294,7 +294,8 @@ export function Dashboard({ dashboardData, loading, onNavigate, onRefreshAll }) 
       {/* 3. Competitive Rating Trajectory Chart (Codeforces + LeetCode Graph) */}
       <RatingGraph 
         codeforcesData={platforms?.codeforces} 
-        leetcodeData={platforms?.leetcode} 
+        leetcodeData={platforms?.leetcode}
+        userHandles={handles}
       />
 
       {/* 4. Two-Column Modular Workspace: Action vs Retention */}
