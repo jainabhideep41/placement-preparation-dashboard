@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { findUserByEmail, saveUserToRegistry, updateUserPasswordInRegistry } from '../utils/accountManager';
 import { 
   Terminal, 
@@ -54,6 +54,106 @@ function GitHubIcon({ className = "w-5 h-5" }) {
     </svg>
   );
 }
+
+/**
+ * Professional 6-digit OTP Input — Google/Stripe/GitHub style
+ * Features: individual boxes, auto-advance, paste support, backspace to prev, keyboard nav
+ */
+function OTPInput({ value, onChange, error, autoFocus = false }) {
+  const inputRefs = useRef([]);
+  const digits = (value || '').split('').concat(Array(6).fill('')).slice(0, 6);
+
+  const focusBox = useCallback((idx) => {
+    const el = inputRefs.current[idx];
+    if (el) { el.focus(); el.select(); }
+  }, []);
+
+  const handleKeyDown = useCallback((e, idx) => {
+    if (e.key === 'Backspace') {
+      if (digits[idx] !== '') {
+        const next = digits.map((d, i) => i === idx ? '' : d).join('');
+        onChange(next);
+      } else if (idx > 0) {
+        const next = digits.map((d, i) => i === idx - 1 ? '' : d).join('');
+        onChange(next);
+        focusBox(idx - 1);
+      }
+      e.preventDefault();
+    } else if (e.key === 'ArrowLeft' && idx > 0) {
+      focusBox(idx - 1);
+      e.preventDefault();
+    } else if (e.key === 'ArrowRight' && idx < 5) {
+      focusBox(idx + 1);
+      e.preventDefault();
+    } else if (e.key === 'Enter') {
+      // Allow form submission via Enter on any box
+    }
+  }, [digits, onChange, focusBox]);
+
+  const handleInput = useCallback((e, idx) => {
+    const raw = e.target.value.replace(/\D/g, '');
+    if (!raw) return;
+    const char = raw[raw.length - 1]; // take last digit typed
+    const next = digits.map((d, i) => i === idx ? char : d).join('');
+    onChange(next);
+    if (idx < 5) focusBox(idx + 1);
+  }, [digits, onChange, focusBox]);
+
+  const handlePaste = useCallback((e) => {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+    if (pasted.length > 0) {
+      const next = pasted.split('').concat(Array(6).fill('')).slice(0, 6).join('');
+      onChange(next);
+      const focusIdx = Math.min(pasted.length, 5);
+      setTimeout(() => focusBox(focusIdx), 0);
+    }
+  }, [onChange, focusBox]);
+
+  useEffect(() => {
+    if (autoFocus) {
+      setTimeout(() => focusBox(0), 50);
+    }
+  }, [autoFocus, focusBox]);
+
+  return (
+    <div>
+      <div className="flex gap-2.5 justify-center" onPaste={handlePaste}>
+        {digits.map((digit, idx) => (
+          <input
+            key={idx}
+            ref={el => inputRefs.current[idx] = el}
+            type="text"
+            inputMode="numeric"
+            maxLength={1}
+            value={digit}
+            onChange={(e) => handleInput(e, idx)}
+            onKeyDown={(e) => handleKeyDown(e, idx)}
+            onFocus={(e) => e.target.select()}
+            className={`w-11 h-14 text-center text-xl font-bold rounded-xl border-2 bg-gray-50 transition-all duration-150 focus:outline-none focus:bg-white caret-transparent ${
+              digit
+                ? error
+                  ? 'border-red-400 text-red-600 bg-red-50'
+                  : 'border-black text-gray-900 bg-white shadow-sm'
+                : error
+                  ? 'border-red-300 text-red-400'
+                  : 'border-gray-200 text-gray-900 focus:border-black focus:shadow-sm'
+            }`}
+            style={{ fontVariantNumeric: 'tabular-nums' }}
+            aria-label={`Digit ${idx + 1}`}
+          />
+        ))}
+      </div>
+      {error && (
+        <p className="mt-2.5 text-center text-xs text-red-600 flex items-center justify-center gap-1.5">
+          <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
 
 export function Login({ onLogin }) {
   const [isRegistering, setIsRegistering] = useState(() => {
@@ -292,23 +392,13 @@ export function Login({ onLogin }) {
 
       if (res.ok && data.success) {
         setRegCooldown(data.cooldownSeconds || 30);
-        setTestOtpNotice(data.testOtp || '');
         if (data.verificationToken) {
           setRegVerificationToken(data.verificationToken);
         }
-        setDeliveryMode(data.emailResult?.mode || (data.sandboxMode ? 'sandbox' : 'smtp'));
-        if (data.testOtp) {
-          setRegVerifyCode(data.testOtp);
-        }
-        if (data.sandboxMode || !data.emailResult?.delivered) {
-          setRegVerifySuccess(
-            `Code auto-filled [${data.testOtp}]. ${data.forwardedToOwner ? '(Notification copy sent to admin)' : ''}`
-          );
-        } else {
-          setRegVerifySuccess(
-            `Verification email dispatched to ${cleanEmail}! We've also auto-filled your code [${data.testOtp}] below so university firewall delays won't block you.`
-          );
-        }
+        setDeliveryMode(data.emailDelivered ? 'smtp' : 'sandbox');
+        setRegVerifySuccess(
+          `We've sent a 6-digit code to ${cleanEmail}. Check your inbox and spam/junk folder.`
+        );
         setRegVerifyError('');
         setShowRegVerifyModal(true);
       } else {
@@ -327,7 +417,7 @@ export function Login({ onLogin }) {
     const cleanEmail = email.trim().toLowerCase();
 
     if (!regVerifyCode.trim() || regVerifyCode.trim().length < 6) {
-      setRegVerifyError('Please enter the 6-digit verification code');
+      setRegVerifyError('Please enter the complete 6-digit code');
       return;
     }
 
@@ -418,14 +508,10 @@ export function Login({ onLogin }) {
       const data = await res.json();
       if (res.ok && data.success) {
         setRegCooldown(data.cooldownSeconds || 30);
-        setTestOtpNotice(data.testOtp || '');
         if (data.verificationToken) {
           setRegVerificationToken(data.verificationToken);
         }
-        if (data.testOtp) {
-          setRegVerifyCode(data.testOtp);
-        }
-        setRegVerifySuccess(`New verification code generated & auto-filled: ${data.testOtp || 'sent'}`);
+        setRegVerifySuccess(`A fresh verification code was sent to ${cleanEmail}. Check your inbox or spam/junk folder.`);
       } else {
         setRegVerifyError(data.message || 'Failed to resend code');
         if (data.remainingCooldown) setRegCooldown(data.remainingCooldown);
@@ -462,16 +548,10 @@ export function Login({ onLogin }) {
 
       if (res.ok && data.success) {
         setForgotCooldown(data.cooldownSeconds || 30);
-        setForgotTestOtp(data.testOtp || '');
         if (data.verificationToken) {
           setForgotVerificationToken(data.verificationToken);
         }
-        if (data.sandboxMode || !data.emailResult?.delivered) {
-          setForgotCode(data.testOtp || '');
-          setForgotSuccess(`Sandbox mode: Reset code auto-filled [${data.testOtp}]`);
-        } else {
-          setForgotSuccess(`Password reset code sent to ${targetEmail}. Check your inbox.`);
-        }
+        setForgotSuccess(`We sent a 6-digit code to ${targetEmail}. Check your inbox and spam/junk folder.`);
         setForgotStep(2);
       } else {
         setForgotError(data.message || 'Failed to dispatch reset code');
@@ -887,116 +967,78 @@ export function Login({ onLogin }) {
         </form>
       </div>
 
-      {/* --- MODAL 1: REGISTRATION EMAIL VERIFICATION CODE MODAL --- */}
+      {/* --- MODAL 1: REGISTRATION EMAIL VERIFICATION CODE MODAL (ENTERPRISE GRADE) --- */}
       {showRegVerifyModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 antialiased">
-          <div className="w-full max-w-sm rounded-2xl bg-white border border-gray-200 shadow-2xl p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150">
-            {/* Header */}
-            <div className="flex items-center justify-between pb-2 border-b border-gray-100">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
-                  <ShieldCheck className="w-4 h-4" />
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 antialiased animate-in fade-in duration-200">
+          <div className="w-full max-w-[420px] rounded-3xl bg-white border border-gray-200/90 shadow-2xl p-7 space-y-5 animate-in zoom-in-95 duration-150">
+            {/* Top Bar */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-black text-white flex items-center justify-center shadow-sm">
+                  <MailCheck className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-semibold text-gray-900">Verify Your Email</h3>
-                  <p className="text-[10px] text-gray-500">Step 2 of 2 &bull; Account activation</p>
+                  <h3 className="text-base font-bold text-gray-900 tracking-tight">Verify Your Email</h3>
+                  <p className="text-[11px] text-gray-500 font-medium">Security &bull; Account Activation</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setShowRegVerifyModal(false)}
-                className="p-1 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100"
+                className="p-1.5 rounded-xl text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer"
+                aria-label="Close"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <p className="text-xs text-gray-600 leading-relaxed">
-              We sent a 6-digit verification code to <strong className="text-gray-900">{email}</strong>. Enter it below to activate your account and receive your welcome email.
-            </p>
+            {/* Subtitle / Email Address Display */}
+            <div className="rounded-2xl bg-gray-50/80 border border-gray-200/70 p-3.5 text-center">
+              <p className="text-[11px] text-gray-500 mb-0.5">We sent a 6-digit verification code to</p>
+              <p className="text-xs font-semibold text-gray-900 font-mono break-all">{email}</p>
+            </div>
 
-            {/* Notifications */}
+            {/* Success Banner */}
             {regVerifySuccess && (
-              <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-start gap-2">
+              <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200/80 text-xs text-emerald-800 flex items-start gap-2">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
                 <span className="leading-relaxed">{regVerifySuccess}</span>
               </div>
             )}
 
-            {regVerifyError && (
-              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-700 flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 text-rose-500 flex-shrink-0 mt-0.5" />
-                <span className="leading-relaxed">{regVerifyError}</span>
-              </div>
-            )}
-
-            {testOtpNotice && (
-              <div className={`p-3 rounded-xl border text-xs space-y-2 ${
-                deliveryMode === 'smtp' 
-                  ? 'bg-blue-50/90 border-blue-200/80 text-blue-950' 
-                  : 'bg-amber-50/90 border-amber-200/80 text-amber-950'
-              }`}>
-                <div className="flex items-center justify-between font-semibold">
-                  <span className={`flex items-center gap-1.5 text-[11px] ${
-                    deliveryMode === 'smtp' ? 'text-blue-800' : 'text-amber-800'
-                  }`}>
-                    {deliveryMode === 'smtp' ? (
-                      <MailCheck className="w-3.5 h-3.5 text-blue-600" />
-                    ) : (
-                      <ShieldCheck className="w-3.5 h-3.5 text-amber-600" />
-                    )}
-                    {deliveryMode === 'smtp' ? 'Live Email Dispatched via Gmail' : 'Resend Sandbox Active'}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setRegVerifyCode(testOtpNotice)}
-                    className={`text-[10px] font-bold px-2 py-0.5 rounded-md cursor-pointer transition-colors ${
-                      deliveryMode === 'smtp'
-                        ? 'text-blue-900 bg-blue-100 hover:bg-blue-200'
-                        : 'text-amber-900 bg-amber-200/80 hover:bg-amber-300/80'
-                    }`}
-                  >
-                    Auto-fill: {testOtpNotice}
-                  </button>
-                </div>
-                <p className={`text-[11px] leading-relaxed font-normal ${
-                  deliveryMode === 'smtp' ? 'text-blue-800/90' : 'text-amber-800/90'
-                }`}>
-                  {deliveryMode === 'smtp' ? (
-                    <>
-                      Sent to <strong>{email}</strong>. Microsoft Outlook often places incoming automated emails in the <strong>Junk Email</strong> folder or the <strong>"Other"</strong> tab. You can also click <strong>Auto-fill</strong> above to verify instantly!
-                    </>
-                  ) : (
-                    <>
-                      Resend free sandbox domain (<code className="bg-amber-100 px-1 py-0.5 rounded text-amber-900 text-[10px]">onboarding@resend.dev</code>) restricts external emails. We've auto-filled your 6-digit code below so you can verify immediately!
-                    </>
-                  )}
-                </p>
-              </div>
-            )}
-
-            {/* OTP Form */}
-            <form onSubmit={handleVerifyRegistrationCode} className="space-y-3.5 text-xs">
+            {/* OTP 6-Box Form */}
+            <form onSubmit={handleVerifyRegistrationCode} className="space-y-5">
               <div>
-                <label className="block text-[11px] font-medium text-gray-700 mb-1">
-                  6-Digit Verification Code
+                <label className="block text-[11px] font-semibold text-gray-700 mb-2.5 text-center uppercase tracking-wider">
+                  Enter 6-Digit Code
                 </label>
-                <input
-                  type="text"
-                  maxLength={6}
-                  required
-                  autoFocus
+                <OTPInput
                   value={regVerifyCode}
-                  onChange={(e) => setRegVerifyCode(e.target.value.replace(/\D/g, ''))}
-                  placeholder="123456"
-                  className="w-full px-3 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-base font-mono tracking-[0.4em] text-center text-gray-900 font-bold focus:outline-none focus:border-black focus:bg-white"
+                  onChange={(val) => {
+                    setRegVerifyCode(val);
+                    if (regVerifyError) setRegVerifyError('');
+                  }}
+                  error={regVerifyError}
+                  autoFocus={true}
                 />
               </div>
 
+              {/* Provider-specific inbox guidance */}
+              <div className="p-3 rounded-xl bg-amber-50/70 border border-amber-200/70 text-[11px] text-amber-900/90 space-y-1">
+                <div className="flex items-center gap-1.5 font-semibold text-amber-950">
+                  <AlertCircle className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
+                  <span>Can't find the email?</span>
+                </div>
+                <p className="text-[10px] leading-relaxed text-amber-800/90">
+                  Please check your <strong>Spam / Junk</strong> folder. In <strong>Outlook / Hotmail</strong>, check the <strong>"Other"</strong> tab. For college/university domains, institutional mail filters can occasionally introduce a 1&ndash;2 minute delivery delay.
+                </p>
+              </div>
+
+              {/* Submit Button */}
               <button
                 type="submit"
                 disabled={regVerifyLoading || regVerifyCode.length < 6}
-                className="w-full h-11 rounded-xl bg-black hover:bg-neutral-800 text-white font-semibold text-xs flex items-center justify-center gap-2 transition-all shadow-xs disabled:opacity-50 cursor-pointer"
+                className="w-full h-11 rounded-xl bg-black hover:bg-neutral-800 text-white font-semibold text-xs flex items-center justify-center gap-2 transition-all shadow-xs active:scale-[0.99] disabled:opacity-50 cursor-pointer"
               >
                 {regVerifyLoading ? (
                   <>
@@ -1005,77 +1047,34 @@ export function Login({ onLogin }) {
                   </>
                 ) : (
                   <>
-                    <span>Verify &amp; Launch Dashboard</span>
+                    <span>Verify Email &amp; Launch Dashboard</span>
                     <ArrowRight className="w-4 h-4" />
                   </>
                 )}
               </button>
 
-              {/* Instant Access Bypass Button for university / institutional firewalls */}
-              <button
-                type="button"
-                onClick={async () => {
-                  setRegVerifyLoading(true);
-                  try {
-                    const cleanEmail = email.trim().toLowerCase();
-                    const res = await fetch('/api/auth/register-or-login', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        email: cleanEmail,
-                        name: name.trim() || cleanEmail.split('@')[0],
-                        password,
-                        handles: {
-                          leetcode: leetcodeHandle.trim(),
-                          codeforces: codeforcesHandle.trim(),
-                          github: githubHandle.trim()
-                        },
-                        targetRole
-                      })
-                    });
-                    const data = await res.json();
-                    const student = saveUserToRegistry({
-                      ...(data.user || {}),
-                      email: cleanEmail,
-                      name: name.trim() || cleanEmail.split('@')[0],
-                      onboardingCompleted: true
-                    });
-                    setShowRegVerifyModal(false);
-                    onLogin(student);
-                  } catch (e) {
-                    const student = saveUserToRegistry({
-                      email: email.trim().toLowerCase(),
-                      name: name.trim() || email.split('@')[0],
-                      onboardingCompleted: true
-                    });
-                    setShowRegVerifyModal(false);
-                    onLogin(student);
-                  } finally {
-                    setRegVerifyLoading(false);
-                  }
-                }}
-                className="w-full h-10 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-gray-200"
-              >
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Instant Access (Bypass Verification)</span>
-              </button>
-
-              <div className="flex items-center justify-between pt-1 text-[11px]">
+              {/* Footer Actions: Change Email & Resend Code */}
+              <div className="flex items-center justify-between pt-1 border-t border-gray-100 text-xs">
                 <button
                   type="button"
                   onClick={() => setShowRegVerifyModal(false)}
-                  className="text-gray-500 hover:text-gray-800 flex items-center gap-1"
+                  className="text-gray-500 hover:text-gray-800 font-medium flex items-center gap-1 cursor-pointer transition-colors"
                 >
-                  <ArrowLeft className="w-3 h-3" /> Change email
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span>Change email</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={handleResendRegCode}
                   disabled={regCooldown > 0 || regVerifyLoading}
-                  className="text-blue-600 hover:text-blue-800 font-semibold disabled:opacity-50"
+                  className="text-blue-600 hover:text-blue-800 font-semibold disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
                 >
-                  {regCooldown > 0 ? `Resend in ${regCooldown}s` : 'Resend Code'}
+                  {regCooldown > 0 ? (
+                    <span className="tabular-nums">Resend in {regCooldown}s</span>
+                  ) : (
+                    'Resend Code'
+                  )}
                 </button>
               </div>
             </form>
@@ -1083,27 +1082,28 @@ export function Login({ onLogin }) {
         </div>
       )}
 
-      {/* --- MODAL 2: FORGOT PASSWORD MODAL --- */}
+      {/* --- MODAL 2: FORGOT PASSWORD MODAL (ENTERPRISE GRADE) --- */}
       {showForgotModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 antialiased">
-          <div className="w-full max-w-sm rounded-2xl bg-white border border-gray-200 shadow-2xl p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 antialiased animate-in fade-in duration-200">
+          <div className="w-full max-w-[420px] rounded-3xl bg-white border border-gray-200/90 shadow-2xl p-7 space-y-5 animate-in zoom-in-95 duration-150">
             {/* Header */}
-            <div className="flex items-center justify-between pb-2 border-b border-gray-100">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-red-50 text-red-600 flex items-center justify-center">
-                  <KeyRound className="w-4 h-4" />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-black text-white flex items-center justify-center shadow-sm">
+                  <KeyRound className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-semibold text-gray-900">Reset Password</h3>
-                  <p className="text-[10px] text-gray-500">
-                    {forgotStep === 1 ? 'Step 1: Request Code' : 'Step 2: Set New Password'}
+                  <h3 className="text-base font-bold text-gray-900 tracking-tight">Reset Password</h3>
+                  <p className="text-[11px] text-gray-500 font-medium">
+                    {forgotStep === 1 ? 'Step 1 of 2 &bull; Identity Verification' : 'Step 2 of 2 &bull; New Security Credentials'}
                   </p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setShowForgotModal(false)}
-                className="p-1 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100"
+                className="p-1.5 rounded-xl text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer"
+                aria-label="Close"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1111,7 +1111,7 @@ export function Login({ onLogin }) {
 
             {/* Notifications */}
             {forgotSuccess && (
-              <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-start gap-2">
+              <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200/80 text-xs text-emerald-800 flex items-start gap-2">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
                 <span className="leading-relaxed">{forgotSuccess}</span>
               </div>
@@ -1124,47 +1124,26 @@ export function Login({ onLogin }) {
               </div>
             )}
 
-            {forgotTestOtp && forgotStep === 2 && (
-              <div className="p-3 rounded-xl bg-amber-50/90 border border-amber-200/80 text-xs text-amber-950 space-y-2">
-                <div className="flex items-center justify-between font-semibold">
-                  <span className="flex items-center gap-1.5 text-amber-800 text-[11px]">
-                    <KeyRound className="w-3.5 h-3.5 text-amber-600" />
-                    Resend Sandbox Active
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setForgotCode(forgotTestOtp)}
-                    className="text-[10px] font-bold text-amber-900 bg-amber-200/80 hover:bg-amber-300/80 px-2 py-0.5 rounded-md cursor-pointer transition-colors"
-                  >
-                    Auto-fill: {forgotTestOtp}
-                  </button>
-                </div>
-                <p className="text-[11px] text-amber-800/90 leading-relaxed font-normal">
-                  Resend sandbox mode auto-filled your code below ({forgotTestOtp}) so you can reset your password immediately.
-                </p>
-              </div>
-            )}
-
             {/* STEP 1: Enter email */}
             {forgotStep === 1 && (
-              <form onSubmit={handleForgotRequest} className="space-y-3.5 text-xs">
-                <p className="text-xs text-gray-600">
-                  Enter your registered email address and we'll send a 6-digit verification code to reset your password.
+              <form onSubmit={handleForgotRequest} className="space-y-4 text-xs">
+                <p className="text-xs text-gray-600 leading-relaxed">
+                  Enter your registered email address and we'll transmit a secure 6-digit verification code to reset your credentials.
                 </p>
 
                 <div>
-                  <label className="block text-[11px] font-medium text-gray-700 mb-1">
+                  <label className="block text-[11px] font-semibold text-gray-700 mb-1.5">
                     Registered Email Address
                   </label>
                   <div className="relative">
-                    <Mail className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                    <Mail className="absolute left-3.5 top-3 w-4 h-4 text-gray-400" />
                     <input
                       type="email"
                       required
                       value={forgotEmail}
                       onChange={(e) => setForgotEmail(e.target.value)}
                       placeholder="student@college.edu"
-                      className="w-full pl-9 pr-3 py-2 rounded-xl bg-gray-50 border border-gray-200 text-xs text-gray-900 focus:outline-none focus:border-black focus:bg-white"
+                      className="w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-xs text-gray-900 focus:outline-none focus:border-black focus:bg-white transition-all"
                     />
                   </div>
                 </div>
@@ -1172,17 +1151,17 @@ export function Login({ onLogin }) {
                 <button
                   type="submit"
                   disabled={forgotLoading}
-                  className="w-full h-10 rounded-xl bg-black hover:bg-neutral-800 text-white font-medium text-xs flex items-center justify-center gap-2 transition-all shadow-xs disabled:opacity-50 cursor-pointer"
+                  className="w-full h-11 rounded-xl bg-black hover:bg-neutral-800 text-white font-semibold text-xs flex items-center justify-center gap-2 transition-all shadow-xs disabled:opacity-50 cursor-pointer"
                 >
                   {forgotLoading ? (
                     <>
                       <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                      <span>Sending Code...</span>
+                      <span>Sending Reset Code...</span>
                     </>
                   ) : (
                     <>
                       <Send className="w-3.5 h-3.5" />
-                      <span>Send Reset Code</span>
+                      <span>Send 6-Digit Code</span>
                     </>
                   )}
                 </button>
@@ -1191,60 +1170,73 @@ export function Login({ onLogin }) {
 
             {/* STEP 2: Enter code & set new password */}
             {forgotStep === 2 && (
-              <form onSubmit={handleResetPasswordSubmit} className="space-y-3 text-xs">
+              <form onSubmit={handleResetPasswordSubmit} className="space-y-4 text-xs">
+                {/* Email Chip */}
+                <div className="rounded-xl bg-gray-50 border border-gray-200/70 p-2.5 text-center">
+                  <p className="text-[10px] text-gray-500">Reset code sent to</p>
+                  <p className="text-xs font-semibold text-gray-900 font-mono break-all">{forgotEmail || email}</p>
+                </div>
+
                 <div>
-                  <label className="block text-[11px] font-medium text-gray-700 mb-1">
-                    6-Digit Verification Code
+                  <label className="block text-[11px] font-semibold text-gray-700 mb-2 text-center uppercase tracking-wider">
+                    6-Digit Security Code
                   </label>
-                  <input
-                    type="text"
-                    maxLength={6}
-                    required
+                  <OTPInput
                     value={forgotCode}
-                    onChange={(e) => setForgotCode(e.target.value.replace(/\D/g, ''))}
-                    placeholder="123456"
-                    className="w-full px-3 py-2 rounded-xl bg-gray-50 border border-gray-200 text-sm font-mono tracking-widest text-center text-gray-900 font-bold focus:outline-none focus:border-black focus:bg-white"
+                    onChange={(val) => {
+                      setForgotCode(val);
+                      if (forgotError) setForgotError('');
+                    }}
+                    error={forgotError}
+                    autoFocus={true}
                   />
                 </div>
 
-                <div>
-                  <label className="block text-[11px] font-medium text-gray-700 mb-1">
-                    New Password (min 6 characters)
-                  </label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-                    <input
-                      type="password"
-                      required
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      placeholder="••••••••••••"
-                      className="w-full pl-9 pr-3 py-2 rounded-xl bg-gray-50 border border-gray-200 text-xs text-gray-900 focus:outline-none focus:border-black focus:bg-white"
-                    />
-                  </div>
-                </div>
+                {/* Spam/Junk Reminder */}
+                <p className="text-[10px] text-center text-gray-500">
+                  Can't find the email? Check your <strong>Spam / Junk</strong> folder or Outlook <strong>"Other"</strong> tab.
+                </p>
 
-                <div>
-                  <label className="block text-[11px] font-medium text-gray-700 mb-1">
-                    Confirm New Password
-                  </label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-                    <input
-                      type="password"
-                      required
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      placeholder="••••••••••••"
-                      className="w-full pl-9 pr-3 py-2 rounded-xl bg-gray-50 border border-gray-200 text-xs text-gray-900 focus:outline-none focus:border-black focus:bg-white"
-                    />
+                <div className="space-y-3 pt-1">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-gray-700 mb-1">
+                      New Password (min 6 characters)
+                    </label>
+                    <div className="relative">
+                      <Lock className="absolute left-3.5 top-3 w-4 h-4 text-gray-400" />
+                      <input
+                        type="password"
+                        required
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        placeholder="••••••••••••"
+                        className="w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-xs text-gray-900 focus:outline-none focus:border-black focus:bg-white transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-gray-700 mb-1">
+                      Confirm New Password
+                    </label>
+                    <div className="relative">
+                      <Lock className="absolute left-3.5 top-3 w-4 h-4 text-gray-400" />
+                      <input
+                        type="password"
+                        required
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        placeholder="••••••••••••"
+                        className="w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-xs text-gray-900 focus:outline-none focus:border-black focus:bg-white transition-all"
+                      />
+                    </div>
                   </div>
                 </div>
 
                 <button
                   type="submit"
-                  disabled={forgotLoading}
-                  className="w-full h-10 rounded-xl bg-black hover:bg-neutral-800 text-white font-medium text-xs flex items-center justify-center gap-2 transition-all shadow-xs disabled:opacity-50 cursor-pointer"
+                  disabled={forgotLoading || forgotCode.length < 6 || newPassword.length < 6}
+                  className="w-full h-11 rounded-xl bg-black hover:bg-neutral-800 text-white font-semibold text-xs flex items-center justify-center gap-2 transition-all shadow-xs active:scale-[0.99] disabled:opacity-50 cursor-pointer"
                 >
                   {forgotLoading ? (
                     <>
@@ -1259,22 +1251,26 @@ export function Login({ onLogin }) {
                   )}
                 </button>
 
-                <div className="flex items-center justify-between pt-1 text-[11px]">
+                <div className="flex items-center justify-between pt-1 border-t border-gray-100 text-xs">
                   <button
                     type="button"
                     onClick={() => setForgotStep(1)}
-                    className="text-gray-500 hover:text-gray-800 flex items-center gap-1"
+                    className="text-gray-500 hover:text-gray-800 font-medium flex items-center gap-1 cursor-pointer transition-colors"
                   >
-                    <ArrowLeft className="w-3 h-3" /> Back
+                    <ArrowLeft className="w-3.5 h-3.5" /> Back
                   </button>
 
                   <button
                     type="button"
                     onClick={handleForgotRequest}
                     disabled={forgotCooldown > 0 || forgotLoading}
-                    className="text-blue-600 hover:text-blue-800 font-semibold disabled:opacity-50"
+                    className="text-blue-600 hover:text-blue-800 font-semibold disabled:opacity-40 cursor-pointer transition-colors"
                   >
-                    {forgotCooldown > 0 ? `Resend in ${forgotCooldown}s` : 'Resend Code'}
+                    {forgotCooldown > 0 ? (
+                      <span className="tabular-nums">Resend in {forgotCooldown}s</span>
+                    ) : (
+                      'Resend Code'
+                    )}
                   </button>
                 </div>
               </form>

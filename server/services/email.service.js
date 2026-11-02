@@ -282,8 +282,7 @@ export async function sendEmail({ to, subject, html, text }) {
         headers: {
           'X-Entity-Ref-ID': `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
           'X-Auto-Response-Suppress': 'OOF, AutoReply',
-          'Importance': 'high',
-          'Priority': 'urgent'
+          'X-Mailer': 'PrepStack Notification System'
         }
       });
       console.log(`[Email Service] ✅ Live email successfully delivered via Gmail SMTP to ${to} (Message ID: ${info.messageId})`);
@@ -460,7 +459,7 @@ export async function sendVerificationEmail({ email, code, name }) {
   const cleanEmail = email.trim().toLowerCase();
   const displayName = name ? name.trim() : cleanEmail.split('@')[0];
 
-  const subject = `Your PrepStack Verification Code: ${code}`;
+  const subject = `PrepStack — Verify your email address`;
   const text = `Hello ${displayName},\n\nYour 6-digit PrepStack verification code is: ${code}\n\nThis verification code expires in 15 minutes.\n\nEnter this code on the verification screen to activate your account.\n\nIf you did not initiate this registration, please disregard this email.\n\nPrepStack Technologies - Developer Portfolio & Technical Placement Readiness Engine\nhttps://placement-preparation-dashboard-five.vercel.app`;
   const content = `
     <div class="badge">Email Verification</div>
@@ -493,7 +492,7 @@ export async function sendPasswordResetEmail({ email, code, name }) {
   const cleanEmail = email.trim().toLowerCase();
   const displayName = name ? name.trim() : cleanEmail.split('@')[0];
 
-  const subject = `Reset Your PrepStack Password: ${code}`;
+  const subject = `PrepStack — Reset your password`;
   const text = `Hello ${displayName},\n\nWe received a request to reset your PrepStack password. Your 6-digit verification code is:\n\n${code}\n\nThis security code expires in 15 minutes.\n\nIf you did not request a password reset, you can safely disregard this message.\n\nPrepStack Technologies\nhttps://placement-preparation-dashboard-five.vercel.app`;
   const content = `
     <div class="badge">Security &bull; Password Reset</div>

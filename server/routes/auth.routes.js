@@ -472,18 +472,21 @@ router.post('/register-request', async (req, res) => {
     name: name || cleanEmail.split('@')[0]
   });
 
+  console.log(`[Auth Register] Verification email dispatched. SMTP delivered: ${emailResult.delivered}, mode: ${emailResult.mode}`);
+  if (!emailResult.delivered) {
+    console.warn(`[Auth Register] ⚠️ Email delivery issue for ${cleanEmail}. SMTP mode: ${emailResult.mode}. Check spam/junk folder guidance.`);
+  }
+
   res.json({
     success: true,
     message: emailResult.delivered
-      ? `Verification code sent to ${cleanEmail}. Please check your inbox or spam folder.`
-      : `Verification code generated for ${cleanEmail}. Resend sandbox mode active.`,
+      ? `Verification code sent to ${cleanEmail}. Please check your inbox (and spam/junk folder).`
+      : `Verification code sent to ${cleanEmail}. If you don't see it within 2 minutes, check your spam or junk folder.`,
     cooldownSeconds: 30,
-    testOtp: code,
     verificationToken,
     expiresAt,
-    sandboxMode: !emailResult.delivered,
-    forwardedToOwner: Boolean(emailResult.forwardedToOwner),
-    emailResult
+    emailDelivered: emailResult.delivered,
+    emailMode: emailResult.mode
   });
 });
 
@@ -605,18 +608,18 @@ router.post('/forgot-password-request', async (req, res) => {
     name: user?.name || cleanEmail.split('@')[0]
   });
 
+  console.log(`[Auth Forgot Password] Reset email dispatched. SMTP delivered: ${emailResult.delivered}, mode: ${emailResult.mode}`);
+
   res.json({
     success: true,
     message: emailResult.delivered
-      ? `Password reset code sent to ${cleanEmail}. Check your inbox.`
-      : `Password reset code generated for ${cleanEmail}. Resend sandbox mode active.`,
+      ? `Password reset code sent to ${cleanEmail}. Check your inbox (and spam/junk folder).`
+      : `Password reset code sent to ${cleanEmail}. If you don't see it within 2 minutes, check your spam or junk folder.`,
     cooldownSeconds: 30,
-    testOtp: code,
     verificationToken,
     expiresAt,
-    sandboxMode: !emailResult.delivered,
-    forwardedToOwner: Boolean(emailResult.forwardedToOwner),
-    emailResult
+    emailDelivered: emailResult.delivered,
+    emailMode: emailResult.mode
   });
 });
 
