@@ -251,16 +251,30 @@ const DEFAULT_SMTP_PASS = ['sqly', 'nbnz', 'irpx', 'bfby'].join('');
 const ACTIVE_SMTP_USER = (process.env.SMTP_USER || DEFAULT_SMTP_USER).trim();
 const ACTIVE_SMTP_PASS = (process.env.SMTP_PASS || process.env.GMAIL_APP_PASSWORD || DEFAULT_SMTP_PASS).replace(/\s+/g, '');
 
-let smtpTransporter = null;
-try {
-  smtpTransporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: { user: ACTIVE_SMTP_USER, pass: ACTIVE_SMTP_PASS }
+/**
+ * Creates a fresh, serverless-safe Nodemailer SMTP transporter.
+ * pool: false is critical for serverless (Vercel/Lambda) so frozen idle sockets are never reused.
+ */
+function createSmtpTransporter() {
+  return nodemailer.createTransport({
+    host: 'smtp.gmail.com',
+    port: 465,
+    secure: true,
+    auth: {
+      user: ACTIVE_SMTP_USER,
+      pass: ACTIVE_SMTP_PASS
+    },
+    tls: {
+      rejectUnauthorized: false
+    },
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 15000,
+    pool: false
   });
-  console.log(`[Email Service] Configured live Gmail SMTP transporter for: ${ACTIVE_SMTP_USER}`);
-} catch (smtpErr) {
-  console.warn(`[Email Service] Could not initialize Gmail SMTP transporter:`, smtpErr.message);
 }
+
+console.log(`[Email Service] Configured resilient Gmail SMTP transporter for: ${ACTIVE_SMTP_USER}`);
 
 /**
  * Core email dispatcher using Gmail SMTP or Resend API
@@ -268,24 +282,30 @@ try {
 export async function sendEmail({ to, subject, html, text }) {
   console.log(`[Email Service] Preparing dispatch to: ${to} | Subject: "${subject}"`);
 
-  // 1. Try Gmail SMTP (Allows sending to ANY recipient worldwide without domain verification)
-  if (smtpTransporter) {
+  // 1. Try Gmail SMTP with automatic fresh retry (Handles warm-start socket drops in serverless)
+  let lastSmtpError = null;
+  for (let attempt = 1; attempt <= 2; attempt++) {
     try {
-      const fromAddress = `PrepStack <${ACTIVE_SMTP_USER}>`;
-      const info = await smtpTransporter.sendMail({
+      const transporter = createSmtpTransporter();
+      const fromAddress = `"PrepStack" <${ACTIVE_SMTP_USER}>`;
+      const info = await transporter.sendMail({
         from: fromAddress,
         replyTo: ACTIVE_SMTP_USER,
         to,
         subject,
         html,
         text: text || subject,
+        envelope: {
+          from: ACTIVE_SMTP_USER,
+          to: [to]
+        },
         headers: {
           'X-Entity-Ref-ID': `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
           'X-Auto-Response-Suppress': 'OOF, AutoReply',
           'X-Mailer': 'PrepStack Notification System'
         }
       });
-      console.log(`[Email Service] ✅ Live email successfully delivered via Gmail SMTP to ${to} (Message ID: ${info.messageId})`);
+      console.log(`[Email Service] ✅ Live email successfully delivered via Gmail SMTP to ${to} (Message ID: ${info.messageId}) [Attempt ${attempt}]`);
       return {
         success: true,
         delivered: true,
@@ -295,7 +315,11 @@ export async function sendEmail({ to, subject, html, text }) {
         messageId: info.messageId
       };
     } catch (smtpErr) {
-      console.warn(`[Email Service] ⚠️ Gmail SMTP delivery error:`, smtpErr.message);
+      lastSmtpError = smtpErr;
+      console.warn(`[Email Service] ⚠️ Gmail SMTP attempt ${attempt} failed for ${to}:`, smtpErr.message);
+      if (attempt < 2) {
+        await new Promise(r => setTimeout(r, 600));
+      }
     }
   }
 

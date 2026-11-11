@@ -659,9 +659,9 @@ export function Login({ onLogin }) {
           }
         }
         setResendMessage(
-          data.emailResult?.delivered
-            ? `Verification email delivered to ${targetEmail}!`
-            : `Code generated for ${targetEmail}: ${data.testOtp || ''} (Resend sandbox mode: code auto-available)`
+          (data.emailDelivered || data.emailResult?.delivered)
+            ? `Verification code dispatched to ${targetEmail}! Please check your inbox and spam/junk folder.`
+            : (data.message || `Verification code sent to ${targetEmail}. Please check your spam/junk folder.`)
         );
         setResendCooldown(data.cooldownSeconds || 30);
       } else {

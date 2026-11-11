@@ -215,12 +215,16 @@ router.get('/github/callback', async (req, res) => {
 
     // 5. Send Welcome Email on first registration
     if (isNewUser && (!existing || !existing.welcomeEmailSent)) {
-      sendWelcomeEmail({
-        email,
-        name: studentUser.name,
-        provider: 'github'
-      }).catch((err) => console.warn('[Email Warning]:', err.message));
-      markWelcomeEmailSent(email);
+      try {
+        await sendWelcomeEmail({
+          email,
+          name: studentUser.name,
+          provider: 'github'
+        });
+        markWelcomeEmailSent(email);
+      } catch (err) {
+        console.warn('[Email Warning]:', err.message);
+      }
     }
 
     const userParam = encodeURIComponent(JSON.stringify({
@@ -319,12 +323,16 @@ router.get('/google/callback', async (req, res) => {
 
     // 4. Send Welcome Email on first registration
     if (isNewUser && (!existing || !existing.welcomeEmailSent)) {
-      sendWelcomeEmail({
-        email,
-        name: studentUser.name,
-        provider: 'google'
-      }).catch((err) => console.warn('[Email Warning]:', err.message));
-      markWelcomeEmailSent(email);
+      try {
+        await sendWelcomeEmail({
+          email,
+          name: studentUser.name,
+          provider: 'google'
+        });
+        markWelcomeEmailSent(email);
+      } catch (err) {
+        console.warn('[Email Warning]:', err.message);
+      }
     }
 
     const userParam = encodeURIComponent(JSON.stringify({
@@ -404,7 +412,7 @@ router.post('/instant-oauth', async (req, res) => {
  * POST /api/auth/complete-onboarding
  * Completes first-time setup for OAuth users with their CP handles
  */
-router.post('/complete-onboarding', (req, res) => {
+router.post('/complete-onboarding', async (req, res) => {
   const { email, handles, targetRole } = req.body;
   if (!email) {
     return res.status(400).json({ success: false, message: 'Email is required' });
@@ -412,12 +420,16 @@ router.post('/complete-onboarding', (req, res) => {
 
   const user = completeUserOnboarding(email, handles, targetRole);
   if (user && !user.welcomeEmailSent) {
-    sendWelcomeEmail({
-      email: user.email,
-      name: user.name,
-      provider: user.provider || 'google'
-    }).catch((err) => console.warn('[Onboarding Welcome Email Warning]:', err.message));
-    markWelcomeEmailSent(user.email);
+    try {
+      await sendWelcomeEmail({
+        email: user.email,
+        name: user.name,
+        provider: user.provider || 'google'
+      });
+      markWelcomeEmailSent(user.email);
+    } catch (err) {
+      console.warn('[Onboarding Welcome Email Warning]:', err.message);
+    }
   }
 
   res.json({ success: true, user });
@@ -550,11 +562,15 @@ router.post('/verify-registration', async (req, res) => {
   });
 
   // Send Welcome Email
-  sendWelcomeEmail({
-    email: cleanEmail,
-    name: user.name,
-    provider: 'email'
-  }).catch((err) => console.warn('[Welcome Email Warning]:', err.message));
+  try {
+    await sendWelcomeEmail({
+      email: cleanEmail,
+      name: user.name,
+      provider: 'email'
+    });
+  } catch (err) {
+    console.warn('[Welcome Email Warning]:', err.message);
+  }
 
   res.json({
     success: true,
@@ -747,15 +763,13 @@ router.post('/resend-verification', async (req, res) => {
   res.json({
     success: true,
     message: emailResult?.delivered
-      ? `Verification code sent to ${cleanEmail}. Check your inbox.`
-      : `Verification code generated for ${cleanEmail}. Resend sandbox mode active.`,
+      ? `A fresh verification code was sent to ${cleanEmail}. Check your inbox (and spam/junk folder).`
+      : `Verification code dispatched to ${cleanEmail}. If you don't see it within 2 minutes, check your spam or junk folder.`,
     cooldownSeconds: 30,
-    testOtp: code,
     verificationToken,
     expiresAt,
-    sandboxMode: !emailResult?.delivered,
-    forwardedToOwner: Boolean(emailResult?.forwardedToOwner),
-    emailResult
+    emailDelivered: Boolean(emailResult?.delivered),
+    emailMode: emailResult?.mode || 'smtp'
   });
 });
 
@@ -797,7 +811,7 @@ router.post('/verify-email-code', (req, res) => {
  * POST /api/auth/register-or-login
  * Direct email sign-in / registration
  */
-router.post('/register-or-login', (req, res) => {
+router.post('/register-or-login', async (req, res) => {
   const { email, name, handles, targetRole, provider = 'email', password } = req.body;
   if (!email) {
     return res.status(400).json({ success: false, message: 'Email is required' });
@@ -820,12 +834,16 @@ router.post('/register-or-login', (req, res) => {
 
   const isNew = !user.welcomeEmailSent;
   if (isNew && user.emailVerified) {
-    sendWelcomeEmail({
-      email: user.email,
-      name: user.name,
-      provider: user.provider || 'email'
-    }).catch(err => console.warn('[Welcome Email Warning]:', err.message));
-    markWelcomeEmailSent(user.email);
+    try {
+      await sendWelcomeEmail({
+        email: user.email,
+        name: user.name,
+        provider: user.provider || 'email'
+      });
+      markWelcomeEmailSent(user.email);
+    } catch (err) {
+      console.warn('[Welcome Email Warning]:', err.message);
+    }
   }
 
   res.json({ success: true, user });
