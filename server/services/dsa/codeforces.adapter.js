@@ -55,6 +55,15 @@ export async function getCodeforcesStats(username = '') {
     const userStatus = await userStatusRes.json();
     let ratingHistory = [];
 
+    function safeIsoDate(ts) {
+      if (!ts) return new Date().toISOString().split('T')[0];
+      const num = Number(ts);
+      if (isNaN(num) || num <= 0) return new Date().toISOString().split('T')[0];
+      const ms = num < 1e11 ? num * 1000 : num;
+      const d = new Date(ms);
+      return isNaN(d.getTime()) ? new Date().toISOString().split('T')[0] : d.toISOString().split('T')[0];
+    }
+
     if (userRatingRes && userRatingRes.ok) {
       try {
         const ratingData = await userRatingRes.json();
@@ -66,7 +75,7 @@ export async function getCodeforcesStats(username = '') {
             rating: r.newRating,
             oldRating: r.oldRating,
             delta: r.newRating - r.oldRating,
-            date: new Date(r.ratingUpdateTimeSeconds * 1000).toISOString().split('T')[0]
+            date: safeIsoDate(r.ratingUpdateTimeSeconds)
           }));
         }
       } catch (e) {
@@ -109,7 +118,7 @@ export async function getCodeforcesStats(username = '') {
               status: 'Solved',
               revisionStatus: 'Done',
               revisionInterval: difficulty === 'Hard' ? '3d' : '7d',
-              lastReviewed: new Date(sub.creationTimeSeconds * 1000).toISOString().split('T')[0],
+              lastReviewed: safeIsoDate(sub.creationTimeSeconds),
               notes: `Rating: ${rating} | Tags: ${sub.problem.tags?.join(', ') || 'None'}`
             });
           }

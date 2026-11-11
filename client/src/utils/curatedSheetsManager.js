@@ -243,10 +243,25 @@ export function matchProblem(problem, rawQuery) {
   if (normKey.includes(q)) return true;
   if (normDay.includes(q)) return true;
 
-  // Clean alphanumeric check (handles "2 sum" vs "2-sum" vs "twosum")
+  // Clean alphanumeric check (handles "2 sum" vs "2-sum" vs "twosum", "two-pointers", "linked-list")
   const cleanQ = q.replace(/[^a-z0-9]/g, '');
   const cleanTitle = normTitle.replace(/[^a-z0-9]/g, '');
-  if (cleanQ && cleanTitle.includes(cleanQ)) return true;
+  const cleanTopic = normTopic.replace(/[^a-z0-9]/g, '');
+  if (cleanQ && (cleanTitle.includes(cleanQ) || cleanTopic.includes(cleanQ))) return true;
+
+  // Multi-word token matching (e.g. "medium tree", "leetcode graph")
+  const words = q.split(/\s+/).filter(w => w.length > 0);
+  if (words.length > 1) {
+    const allWordsMatch = words.every(w => {
+      const cw = w.replace(/[^a-z0-9]/g, '');
+      return normTitle.includes(w) ||
+        normTopic.includes(w) ||
+        normPlatform.includes(w) ||
+        normDiff.includes(w) ||
+        (cw && (cleanTitle.includes(cw) || cleanTopic.includes(cw)));
+    });
+    if (allWordsMatch) return true;
+  }
 
   // Number substitution (2 <-> two, 3 <-> three)
   const numberWordMap = {

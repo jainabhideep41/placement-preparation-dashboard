@@ -123,6 +123,15 @@ export async function getLeetCodeStats(username = '') {
       ? `#${matchedUser.profile.ranking.toLocaleString()}`
       : (contest?.topPercentage ? `Top ${contest.topPercentage}%` : 'Unranked');
 
+    function safeIsoDate(ts) {
+      if (!ts) return new Date().toISOString().split('T')[0];
+      const num = Number(ts);
+      if (isNaN(num) || num <= 0) return new Date().toISOString().split('T')[0];
+      const ms = num < 1e11 ? num * 1000 : num;
+      const d = new Date(ms);
+      return isNaN(d.getTime()) ? new Date().toISOString().split('T')[0] : d.toISOString().split('T')[0];
+    }
+
     const contestHistory = (data?.data?.userContestRankingHistory || [])
       .filter(h => h.attended)
       .map(h => ({
@@ -131,7 +140,7 @@ export async function getLeetCodeStats(username = '') {
         ranking: h.ranking,
         problemsSolved: h.problemsSolved,
         trendDirection: h.trendDirection,
-        date: new Date(Number(h.contest?.startTime) * 1000).toISOString().split('T')[0]
+        date: safeIsoDate(h.contest?.startTime)
       }));
 
     const recentSubmissions = (data?.data?.recentAcSubmissionList || []).map(s => ({
@@ -144,7 +153,7 @@ export async function getLeetCodeStats(username = '') {
       status: 'Solved',
       revisionStatus: 'Done',
       revisionInterval: '7d',
-      lastReviewed: new Date(Number(s.timestamp) * 1000).toISOString().split('T')[0],
+      lastReviewed: safeIsoDate(s.timestamp),
       notes: `Synced from LeetCode account @${username}`
     }));
 

@@ -131,10 +131,15 @@ export function getResumeStructuredData(profile, options = {}) {
   }));
 
   // Selected projects ticked by the user for resume
-  const selectedResumeProjectIds = profile?.selectedResumeProjectIds || options.selectedResumeProjectIds || null;
-  const projects = (Array.isArray(selectedResumeProjectIds) && selectedResumeProjectIds.length > 0)
+  const selectedResumeProjectIds = (options.selectedResumeProjectIds !== undefined && options.selectedResumeProjectIds !== null)
+    ? options.selectedResumeProjectIds
+    : (profile?.selectedResumeProjectIds || null);
+  let projects = (Array.isArray(selectedResumeProjectIds) && selectedResumeProjectIds.length > 0)
     ? standardizedProjects.filter(p => selectedResumeProjectIds.includes(p.id))
     : standardizedProjects.slice(0, 2);
+  if (projects.length === 0 && standardizedProjects.length > 0) {
+    projects = standardizedProjects.slice(0, 2);
+  }
 
   // Technical Skills (Modifiable with defaults)
   const defaultTechnicalSkills = {

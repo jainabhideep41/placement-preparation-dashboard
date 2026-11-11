@@ -130,7 +130,7 @@ export function PlacementReadiness({ dashboardData, onNavigate, onRefreshDashboa
           : (currentUser.customWeights.developerActivity ?? 10)
       });
     }
-  }, [currentUser?.email]);
+  }, [currentUser?.email, currentUser?.customWeights]);
 
   const activeRoleConfig = CALIBRATED_ROLES.find(r => r.id === selectedRole) || CALIBRATED_ROLES[0];
 

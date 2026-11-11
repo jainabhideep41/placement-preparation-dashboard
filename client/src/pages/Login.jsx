@@ -70,12 +70,13 @@ function OTPInput({ value, onChange, error, autoFocus = false }) {
 
   const handleKeyDown = useCallback((e, idx) => {
     if (e.key === 'Backspace') {
-      if (digits[idx] !== '') {
-        const next = digits.map((d, i) => i === idx ? '' : d).join('');
-        onChange(next);
+      const currentDigits = (value || '').split('');
+      if (currentDigits[idx]) {
+        currentDigits.splice(idx, 1);
+        onChange(currentDigits.join(''));
       } else if (idx > 0) {
-        const next = digits.map((d, i) => i === idx - 1 ? '' : d).join('');
-        onChange(next);
+        currentDigits.splice(idx - 1, 1);
+        onChange(currentDigits.join(''));
         focusBox(idx - 1);
       }
       e.preventDefault();
@@ -85,26 +86,26 @@ function OTPInput({ value, onChange, error, autoFocus = false }) {
     } else if (e.key === 'ArrowRight' && idx < 5) {
       focusBox(idx + 1);
       e.preventDefault();
-    } else if (e.key === 'Enter') {
-      // Allow form submission via Enter on any box
     }
-  }, [digits, onChange, focusBox]);
+  }, [value, onChange, focusBox]);
 
   const handleInput = useCallback((e, idx) => {
     const raw = e.target.value.replace(/\D/g, '');
     if (!raw) return;
     const char = raw[raw.length - 1]; // take last digit typed
-    const next = digits.map((d, i) => i === idx ? char : d).join('');
-    onChange(next);
-    if (idx < 5) focusBox(idx + 1);
-  }, [digits, onChange, focusBox]);
+    const currentDigits = (value || '').split('').slice(0, 6);
+    const targetIdx = Math.min(idx, currentDigits.length);
+    currentDigits[targetIdx] = char;
+    const nextVal = currentDigits.join('').slice(0, 6);
+    onChange(nextVal);
+    if (targetIdx < 5) focusBox(targetIdx + 1);
+  }, [value, onChange, focusBox]);
 
   const handlePaste = useCallback((e) => {
     e.preventDefault();
     const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
     if (pasted.length > 0) {
-      const next = pasted.split('').concat(Array(6).fill('')).slice(0, 6).join('');
-      onChange(next);
+      onChange(pasted);
       const focusIdx = Math.min(pasted.length, 5);
       setTimeout(() => focusBox(focusIdx), 0);
     }

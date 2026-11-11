@@ -131,7 +131,12 @@ export function Navbar({
   const [navSearchQuery, setNavSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [activeCategoryFilter, setActiveCategoryFilter] = useState('All'); // 'All' | 'dsa' | 'sysdesign' | 'webdev' | 'career'
+  const [selectedIndex, setSelectedIndex] = useState(0);
   const searchRef = useRef(null);
+
+  useEffect(() => {
+    setSelectedIndex(0);
+  }, [navSearchQuery, activeCategoryFilter]);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -254,8 +259,19 @@ export function Navbar({
             }}
             onFocus={() => setIsSearchOpen(true)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && searchResults.length > 0) {
-                handleNavigateItem(searchResults[0]);
+              if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                setSelectedIndex(prev => (searchResults.length > 0 ? (prev + 1) % searchResults.length : 0));
+              } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                setSelectedIndex(prev => (searchResults.length > 0 ? (prev - 1 + searchResults.length) % searchResults.length : 0));
+              } else if (e.key === 'Enter') {
+                e.preventDefault();
+                if (searchResults[selectedIndex]) {
+                  handleNavigateItem(searchResults[selectedIndex]);
+                } else if (searchResults.length > 0) {
+                  handleNavigateItem(searchResults[0]);
+                }
               } else if (e.key === 'Escape') {
                 setIsSearchOpen(false);
               }
@@ -309,11 +325,14 @@ export function Navbar({
                 </div>
               ) : (
                 <div className="divide-y divide-black/5 max-h-96 overflow-y-auto">
-                  {searchResults.map((item) => (
+                  {searchResults.map((item, idx) => (
                     <div 
                       key={`${item.type}_${item.id}`}
                       onClick={() => handleNavigateItem(item)}
-                      className="p-3 hover:bg-[#F4F4F0] transition-colors flex items-center justify-between gap-3 text-xs cursor-pointer group"
+                      onMouseEnter={() => setSelectedIndex(idx)}
+                      className={`p-3 transition-colors flex items-center justify-between gap-3 text-xs cursor-pointer group ${
+                        idx === selectedIndex ? 'bg-[#ECECE6] ring-1 ring-black/15' : 'hover:bg-[#F4F4F0]'
+                      }`}
                     >
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 mb-1 flex-wrap">

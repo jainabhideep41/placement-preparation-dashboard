@@ -125,6 +125,12 @@ export function PublicProfile({ currentUser }) {
             projects: (Array.isArray(localUser?.projects) && localUser.projects.length > 0)
               ? localUser.projects
               : (data.profile.projects || []),
+            achievements: (Array.isArray(localUser?.achievements) && localUser.achievements.length > 0)
+              ? localUser.achievements
+              : (data.profile.achievements || (Array.isArray(localUser?.academic?.achievements) ? localUser.academic.achievements : [])),
+            extracurriculars: (Array.isArray(localUser?.extracurriculars) && localUser.extracurriculars.length > 0)
+              ? localUser.extracurriculars
+              : (data.profile.extracurriculars || (Array.isArray(localUser?.academic?.extracurriculars) ? localUser.academic.extracurriculars : [])),
             selectedResumeProjectIds: localUser?.selectedResumeProjectIds || data.profile.selectedResumeProjectIds || ['proj_prepstack', 'proj_flashdrop'],
             handles: {
               leetcode: localHandles?.leetcode || data.profile.handles?.leetcode || '',
@@ -160,6 +166,12 @@ export function PublicProfile({ currentUser }) {
           class10: localUser?.class10 || localUser?.academic?.class10 || null,
           experience: (Array.isArray(localUser?.experience) && localUser.experience.length > 0) ? localUser.experience : [],
           technicalSkills: localUser?.technicalSkills || null,
+          achievements: (Array.isArray(localUser?.achievements) && localUser.achievements.length > 0)
+            ? localUser.achievements
+            : (Array.isArray(localUser?.academic?.achievements) ? localUser.academic.achievements : []),
+          extracurriculars: (Array.isArray(localUser?.extracurriculars) && localUser.extracurriculars.length > 0)
+            ? localUser.extracurriculars
+            : (Array.isArray(localUser?.academic?.extracurriculars) ? localUser.academic.extracurriculars : []),
           selectedResumeProjectIds: localUser?.selectedResumeProjectIds || ['proj_prepstack', 'proj_flashdrop'],
           handles: {
             leetcode: localHandles?.leetcode || '',

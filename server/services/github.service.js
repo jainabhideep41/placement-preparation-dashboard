@@ -316,7 +316,10 @@ export async function getGitHubStats(username = '') {
         publicRepos: userData.public_repos || 0,
         followers: userData.followers || 0,
         following: userData.following || 0,
-        joinedYear: new Date(userData.created_at || '2023-01-01').getFullYear(),
+        joinedYear: (() => {
+          const d = new Date(userData.created_at || '2023-01-01');
+          return isNaN(d.getTime()) ? 2023 : d.getFullYear();
+        })(),
         location: userData.location || 'Remote',
         totalStars,
         totalCommitsLastYear: verifiedCommits,

@@ -75,9 +75,12 @@ export function calculateReadiness({
 }) {
   const calibratedRole = getCalibratedRoleConfig(targetRole);
   const rawW = customWeights ? { ...calibratedRole.weights, ...customWeights } : calibratedRole.weights;
-  const normalizedDevWeight = rawW.developerActivity !== undefined ? rawW.developerActivity : (rawW.devActivity !== undefined ? rawW.devActivity : 10);
+  const normalizedDevWeight = Number(rawW.developerActivity !== undefined ? rawW.developerActivity : (rawW.devActivity !== undefined ? rawW.devActivity : 10)) || 0;
   const W = {
-    ...rawW,
+    dsa: Number(rawW.dsa ?? 40) || 0,
+    webDev: Number(rawW.webDev ?? 15) || 0,
+    systemDesign: Number(rawW.systemDesign ?? 25) || 0,
+    projects: Number(rawW.projects ?? 10) || 0,
     developerActivity: normalizedDevWeight,
     devActivity: normalizedDevWeight
   };
@@ -147,15 +150,15 @@ export function calculateReadiness({
     : 0;
 
   // Calibrated Overall Score calculation using dynamic weights
-  const devWeight = W.developerActivity !== undefined ? W.developerActivity : (W.devActivity || 0);
-  const totalWeight = (W.dsa || 0) + (W.webDev || 0) + (W.systemDesign || 0) + (W.projects || 0) + devWeight || 100;
-  const overallScore = Math.round(
-    ((dsaScore * (W.dsa || 0)) +
-     (webDevScore * (W.webDev || 0)) +
-     (sysScore * (W.systemDesign || 0)) +
-     (projectScore * (W.projects || 0)) +
+  const devWeight = W.developerActivity;
+  const totalWeight = (W.dsa + W.webDev + W.systemDesign + W.projects + devWeight) || 100;
+  const overallScore = Math.max(0, Math.min(100, Math.round(
+    ((dsaScore * W.dsa) +
+     (webDevScore * W.webDev) +
+     (sysScore * W.systemDesign) +
+     (projectScore * W.projects) +
      (devScore * devWeight)) / totalWeight
-  );
+  )));
 
   // Determine readiness status tier
   let status = 'Keep Preparing';
