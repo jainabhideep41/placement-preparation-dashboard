@@ -95,8 +95,8 @@ export function RatingGraph({ codeforcesData, leetcodeData, userHandles = {} }) 
     : (leetcodeData?.contestRating || 0);
 
   const selfMaxRating = activePlatform === 'codeforces'
-    ? (codeforcesData?.maxRating || selfCurrentRating)
-    : Math.max(...(selfHistory.map(h => h.rating) || [selfCurrentRating, 1500]));
+    ? (codeforcesData?.maxRating || selfCurrentRating || 1200)
+    : (selfHistory.length > 0 ? Math.max(...selfHistory.map(h => h.rating).filter(Boolean), selfCurrentRating || 1500) : (selfCurrentRating || 1500));
 
   const selfRankBadge = activePlatform === 'codeforces'
     ? (codeforcesData?.rank || 'Unrated')
@@ -163,8 +163,8 @@ export function RatingGraph({ codeforcesData, leetcodeData, userHandles = {} }) 
         : (d.contestRating || 0);
 
       const maxRating = activePlatform === 'codeforces'
-        ? (d.maxRating || rating)
-        : Math.max(...(history.map(h => h.rating) || [rating, 1500]));
+        ? (d.maxRating || rating || 1200)
+        : (history.length > 0 ? Math.max(...history.map(h => h.rating).filter(Boolean), rating || 1500) : (rating || 1500));
 
       // Fallback synthetic curve if rated user has 0 contest history entries
       if (history.length === 0 && rating > 0) {

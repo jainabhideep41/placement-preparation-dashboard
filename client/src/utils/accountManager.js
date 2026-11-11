@@ -103,6 +103,12 @@ export function saveUserToRegistry(user, isExplicitUpdate = false) {
         ? (user.extracurriculars ?? user.academic?.extracurriculars ?? [])
         : (existing?.extracurriculars ?? existing?.academic?.extracurriculars ?? []))
       : (existing?.extracurriculars ?? existing?.academic?.extracurriculars ?? user.extracurriculars ?? user.academic?.extracurriculars ?? []),
+    class12: isExplicitUpdate
+      ? (user.class12 !== undefined ? user.class12 : (user.academic?.class12 ?? existing?.class12 ?? existing?.academic?.class12 ?? null))
+      : (existing?.class12 ?? existing?.academic?.class12 ?? user.class12 ?? user.academic?.class12 ?? null),
+    class10: isExplicitUpdate
+      ? (user.class10 !== undefined ? user.class10 : (user.academic?.class10 ?? existing?.class10 ?? existing?.academic?.class10 ?? null))
+      : (existing?.class10 ?? existing?.academic?.class10 ?? user.class10 ?? user.academic?.class10 ?? null),
     experience: isExplicitUpdate
       ? (user.experience !== undefined ? user.experience : (existing?.experience ?? []))
       : (existing?.experience ?? user.experience ?? []),

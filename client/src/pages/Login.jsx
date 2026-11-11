@@ -317,6 +317,7 @@ export function Login({ onLogin }) {
           provider: 'email'
         })
       });
+      const data = res.ok ? await res.json() : null;
       const serverUser = data?.user || {};
       const mergedHandles = {
         leetcode: existing?.handles?.leetcode || serverUser?.handles?.leetcode || '',

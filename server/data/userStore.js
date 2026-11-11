@@ -148,6 +148,12 @@ export function saveOrMergeUser(userData) {
       extracurriculars: (isExplicit && (userData.extracurriculars !== undefined || userData.academic?.extracurriculars !== undefined))
         ? (userData.extracurriculars ?? userData.academic?.extracurriculars ?? [])
         : (userData.extracurriculars ?? userData.academic?.extracurriculars ?? existing.extracurriculars ?? existing.academic?.extracurriculars ?? []),
+      class12: (isExplicit && (userData.class12 !== undefined || userData.academic?.class12 !== undefined))
+        ? (userData.class12 ?? userData.academic?.class12)
+        : (userData.class12 ?? userData.academic?.class12 ?? existing.class12 ?? existing.academic?.class12 ?? null),
+      class10: (isExplicit && (userData.class10 !== undefined || userData.academic?.class10 !== undefined))
+        ? (userData.class10 ?? userData.academic?.class10)
+        : (userData.class10 ?? userData.academic?.class10 ?? existing.class10 ?? existing.academic?.class10 ?? null),
       experience: (isExplicit && userData.experience !== undefined)
         ? userData.experience
         : (userData.experience ?? existing.experience ?? []),
@@ -216,6 +222,8 @@ export function saveOrMergeUser(userData) {
     },
     achievements: userData.achievements || userData.academic?.achievements || [],
     extracurriculars: userData.extracurriculars || userData.academic?.extracurriculars || [],
+    class12: userData.class12 || userData.academic?.class12 || null,
+    class10: userData.class10 || userData.academic?.class10 || null,
     experience: userData.experience || [],
     technicalSkills: userData.technicalSkills || null,
     projects: userData.projects || null,
